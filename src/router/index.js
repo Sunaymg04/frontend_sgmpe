@@ -1,11 +1,35 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import HomeView from "../views/HomeView.vue";
 
+import DashboardView from "../views/DashboardView.vue";
+import AsignaturaListView from "../views/asignatura/AsignaturaListView.vue";
+import CurriculoListView from "../views/curriculo/CurriculoListView.vue";
+import DisciplinaListView from "../views/disciplina/DisciplinaListView";
+import AnioListView from "../views/anio/AnioListView.vue";
 const routes = [
   {
     path: "/",
-    name: "home",
-    component: HomeView,
+    name: "dashboard",
+    component: DashboardView,
+  },
+  {
+    path: "/asignatura",
+    name: "asignatura",
+    component: AsignaturaListView,
+  },
+  {
+    path: "/curriculo",
+    name: "curriculo",
+    component: CurriculoListView,
+  },
+  {
+    path: "/anio",
+    name: "anio",
+    component: AnioListView,
+  },
+  {
+    path: "/disciplina",
+    name: "disciplina",
+    component: DisciplinaListView,
   },
   {
     path: "/about",
