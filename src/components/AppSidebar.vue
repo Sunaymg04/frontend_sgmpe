@@ -3,24 +3,10 @@
     <v-list nav density="comfortable">
       <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" to="/" />
 
-      <v-list-item prepend-icon="mdi-calendar" title="Año" to="/anio" />
-
-      <v-list-item
-        prepend-icon="mdi-book-open-variant"
-        title="Asignatura"
-        to="/asignatura"
-      />
-
-      <v-list-item
-        prepend-icon="mdi-file-document-outline"
-        title="Currículo"
-        to="/curriculo"
-      />
-
       <v-list-item
         prepend-icon="mdi-shape-outline"
-        title="Disciplina"
-        to="/disciplina"
+        title="Estructura Curricular"
+        to="/estructura_curricular"
       />
     </v-list>
   </v-navigation-drawer>

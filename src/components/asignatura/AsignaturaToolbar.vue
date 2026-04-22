@@ -10,7 +10,7 @@
     </v-col>
 
     <v-col cols="6" class="text-right">
-      <v-btn color="primary" @click="$emit('crear')"> Crear Asignatura </v-btn>
+      <v-btn color="primary" @click="$emit('crear')"> Añadir </v-btn>
     </v-col>
   </v-row>
 </template>
