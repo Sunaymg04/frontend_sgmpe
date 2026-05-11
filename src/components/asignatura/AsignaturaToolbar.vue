@@ -4,7 +4,8 @@
       <v-text-field
         label="Buscar por nombre o código"
         prepend-inner-icon="mdi-magnify"
-        density="comfortable"
+        variant="outlined"
+        rounded="lg"
         v-model="searchModel"
       />
     </v-col>

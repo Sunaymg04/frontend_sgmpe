@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar color="primary" density="comfortable">
+  <v-app-bar class="modern-navbar" elevation="0">
     <v-toolbar-title class="text-h6 font-weight-bold">
       Sistema de Gestión de Planes de Estudio
     </v-toolbar-title>
@@ -31,3 +31,10 @@ export default {
   },
 };
 </script>
+<style scoped>
+.modern-navbar {
+  background: linear-gradient(to bottom, #1d4ed8, #3b82f6);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+</style>

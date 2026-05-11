@@ -5,7 +5,8 @@
         label="Buscar por nombre o código"
         v-model="searchModel"
         prepend-inner-icon="mdi-magnify"
-        density="comfortable"
+        variant="outlined"
+        rounded="lg"
       />
     </v-col>
 

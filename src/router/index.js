@@ -4,7 +4,7 @@ import DashboardView from "../views/DashboardView.vue";
 import AsignaturaListView from "../views/asignatura/AsignaturaListView.vue";
 import CurriculoListView from "../views/curriculo/CurriculoListView.vue";
 import DisciplinaListView from "../views/disciplina/DisciplinaListView";
-import AnioListView from "../views/anio/AnioListView.vue";
+
 import EstructuraCurricularViews from "../views/EstructuraCurricularViews.vue";
 const routes = [
   {
@@ -22,11 +22,7 @@ const routes = [
     name: "curriculo",
     component: CurriculoListView,
   },
-  {
-    path: "/anio",
-    name: "anio",
-    component: AnioListView,
-  },
+
   {
     path: "/disciplina",
     name: "disciplina",

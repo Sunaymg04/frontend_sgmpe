@@ -4,13 +4,16 @@
       <v-text-field
         label="Buscar por nombre o código"
         prepend-inner-icon="mdi-magnify"
-        density="comfortable"
+        variant="outlined"
+        rounded="lg"
         v-model="searchModel"
       />
     </v-col>
 
     <v-col cols="6" class="text-right">
-      <v-btn color="primary" @click="$emit('crear')"> Añadir </v-btn>
+      <v-btn color="primary" rounded="x1" elevation="2" @click="$emit('crear')">
+        Añadir
+      </v-btn>
     </v-col>
   </v-row>
 </template>
