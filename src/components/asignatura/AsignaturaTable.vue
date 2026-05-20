@@ -8,7 +8,7 @@
     >
       <template v-slot:[`item.disciplinas`]="{ item }">
         <v-chip
-          v-for="d in item.disciplinas"
+          v-for="d in item.nombresDisciplinas"
           :key="d"
           class="ma-1"
           color="primary"
@@ -17,27 +17,21 @@
           {{ d }}
         </v-chip>
       </template>
-      <template v-slot:[`item.ano`]="{ item }">
-        <v-chip
-          v-for="a in item.ano"
-          :key="a"
-          class="ma-1"
-          color="secondary"
-          size="small"
-        >
-          {{ a }}
-        </v-chip>
-      </template>
-      <template v-slot:[`item.programa`]="{ item }">
-        <v-chip
-          v-for="p in item.programa"
-          :key="p"
-          class="ma-1"
-          color="green"
-          size="small"
-        >
-          {{ p }}
-        </v-chip>
+      <template v-slot:[`item.anoPrograma`]="{ item }">
+        <div class="ano-programa-wrap">
+          <div
+            v-for="(ap, idx) in item.anoPrograma"
+            :key="`${ap.ano}-${ap.programa}-${idx}`"
+            class="ano-programa-pair"
+          >
+            <v-chip class="ma-1" color="secondary" size="small">
+              {{ ap.ano }}
+            </v-chip>
+            <v-chip class="ma-1" color="green" size="small">
+              {{ ap.programa }}
+            </v-chip>
+          </div>
+        </div>
       </template>
       <template v-slot:[`item.acciones`]="{ item }">
         <div class="acciones-btns">
@@ -78,8 +72,7 @@ export default {
         { title: "Nombre de la asignatura", key: "nombre" },
         { title: "Fondo de tiempo", key: "fondo_tiempo" },
         { title: "Disciplina", key: "disciplinas" },
-        { title: "Año", key: "ano" },
-        { title: "Programa de Formación", key: "programa" },
+        { title: "Año / Programa de Formación", key: "anoPrograma" },
         { title: "Acciones", key: "acciones", sortable: false },
       ],
     };
@@ -141,21 +134,25 @@ export default {
 
           const nombresAnos = [];
           const nombresProgramas = [];
+          const anoPrograma = [];
           relAno.forEach((r) => {
             const ano = mapaAno[r.id_a_academico];
 
             if (ano) {
               nombresAnos.push(ano.nombre);
 
-              nombresProgramas.push(mapaPrograma[ano.id_prog_form] || "");
+              const programa = mapaPrograma[ano.id_prog_form] || "";
+              nombresProgramas.push(programa);
+              anoPrograma.push({ ano: ano.nombre, programa });
             }
           });
 
           return {
             ...a,
-            disciplinas: nombresDisciplinas,
+            nombresDisciplinas,
             ano: nombresAnos,
             programa: nombresProgramas,
+            anoPrograma,
           };
         });
 
@@ -177,7 +174,7 @@ export default {
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
-.modern-table :depp(th) {
+.modern-table :deep(th) {
   font-weight: 700;
   color: #0f172a;
   font-size: 13.5px;
@@ -186,6 +183,16 @@ export default {
 }
 .modern-table :deep(thead) {
   background: linear-gradient(to right, #f8fafc, #f1f5f9);
+}
+.ano-programa-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ano-programa-pair {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 .acciones-btns {
   display: flex;

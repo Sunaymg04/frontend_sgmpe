@@ -7,7 +7,7 @@
           mdi-file-document-edit-outline
         </v-icon>
 
-        Crear Currículo
+        {{ form.id ? "Editar Currículo" : "Crear Currículo" }}
       </v-card-title>
 
       <!-- Formulario -->
@@ -59,15 +59,17 @@ import api from "@/services/api";
 export default {
   props: {
     modelValue: Boolean,
+    curriculo: Object,
   },
 
-  emits: ["update:modelValue", "guardado", "error"],
+  emits: ["update:modelValue", "guardado", "error", "cerrado"],
 
   data() {
     return {
       planes: [],
 
       form: {
+        id: null,
         nombre: "",
         id_plan_estudio: [],
       },
@@ -85,6 +87,25 @@ export default {
       },
     },
   },
+  watch: {
+    curriculo: {
+      immediate: true,
+
+      handler(valor) {
+        if (valor) {
+          this.form = {
+            id: valor.id,
+
+            nombre: valor.nombre,
+
+            id_plan_estudio: Array.isArray(valor.planes_estudio)
+              ? valor.planes_estudio.map((p) => Number(p.id))
+              : [],
+          };
+        }
+      },
+    },
+  },
 
   methods: {
     async obtenerPlanes() {
@@ -99,15 +120,32 @@ export default {
 
     async guardar() {
       try {
-        await api.post("/curriculo", this.form);
+        // EDITAR
+
+        if (this.form.id) {
+          await api.put(`/curriculo/${this.form.id}`, this.form);
+        }
+
+        // CREAR
+        else {
+          await api.post("/curriculo", this.form);
+        }
+
         this.cerrar();
 
         this.$nextTick(() => {
-          this.$emit("guardado", "Curriculo creado correctamente");
+          this.$emit(
+            "guardado",
+
+            this.form.id
+              ? "Currículo actualizado correctamente"
+              : "Currículo creado correctamente"
+          );
         });
       } catch (error) {
         console.error(error);
-        this.$emit("error", "No se pudo crear el currículo");
+
+        this.$emit("error", "No se pudo guardar el currículo");
       }
     },
 
@@ -115,9 +153,11 @@ export default {
       this.dialog = false;
 
       this.form = {
+        id: null,
         nombre: "",
         id_plan_estudio: [],
       };
+      this.$emit("cerrado");
     },
   },
 

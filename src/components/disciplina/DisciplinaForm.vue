@@ -11,7 +11,7 @@
           mdi-book-open-page-variant
         </v-icon>
 
-        Crear Disciplina
+        {{ form.id ? "Editar Disciplina" : "Crear Disciplina" }}
       </v-card-title>
 
       <!-- Form -->
@@ -74,15 +74,17 @@ import api from "@/services/api";
 export default {
   props: {
     modelValue: Boolean,
+    disciplina: Object,
   },
 
-  emits: ["update:modelValue", "guardado", "error"],
+  emits: ["update:modelValue", "guardado", "error", "cerrado"],
 
   data() {
     return {
       curriculos: [],
 
       form: {
+        id: null,
         nombre: "",
         fondo_tiempo: "",
         id_curriculo: [],
@@ -101,6 +103,27 @@ export default {
       },
     },
   },
+  watch: {
+    disciplina: {
+      immediate: true,
+
+      handler(valor) {
+        if (valor) {
+          this.form = {
+            id: valor.id,
+
+            nombre: valor.nombre,
+
+            fondo_tiempo: valor.fondo_tiempo,
+
+            id_curriculo: Array.isArray(valor.curriculos)
+              ? valor.curriculos.map((c) => Number(c.id))
+              : [],
+          };
+        }
+      },
+    },
+  },
 
   methods: {
     async obtenerCurriculos() {
@@ -115,17 +138,32 @@ export default {
 
     async guardar() {
       try {
-        await api.post("/disciplina", this.form);
+        // EDITAR
+
+        if (this.form.id) {
+          await api.put(`/disciplina/${this.form.id}`, this.form);
+        }
+
+        // CREAR
+        else {
+          await api.post("/disciplina", this.form);
+        }
 
         this.cerrar();
 
         this.$nextTick(() => {
-          this.$emit("guardado", "Disciplina creada correctamente");
+          this.$emit(
+            "guardado",
+
+            this.form.id
+              ? "Disciplina actualizada correctamente"
+              : "Disciplina creada correctamente"
+          );
         });
       } catch (error) {
         console.error(error);
 
-        this.$emit("error", "No se pudo crear la disciplina");
+        this.$emit("error", "No se pudo guardar la disciplina");
       }
     },
 
@@ -133,10 +171,12 @@ export default {
       this.dialog = false;
 
       this.form = {
+        id: null,
         nombre: "",
         fondo_tiempo: "",
         id_curriculo: [],
       };
+      this.$emit("cerrado");
     },
   },
 

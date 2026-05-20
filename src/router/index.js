@@ -4,9 +4,17 @@ import DashboardView from "../views/DashboardView.vue";
 import AsignaturaListView from "../views/asignatura/AsignaturaListView.vue";
 import CurriculoListView from "../views/curriculo/CurriculoListView.vue";
 import DisciplinaListView from "../views/disciplina/DisciplinaListView";
+import LoginView from "../views/LoginView.vue";
 
 import EstructuraCurricularViews from "../views/EstructuraCurricularViews.vue";
+import store from "../store";
 const routes = [
+  {
+    path: "/login",
+    name: "login",
+    component: LoginView,
+    meta: { public: true },
+  },
   {
     path: "/",
     name: "dashboard",
@@ -47,6 +55,21 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+});
+
+router.beforeEach((to) => {
+  const isPublic = Boolean(to.meta?.public);
+  const isAuthed = store.getters.isAuthenticated;
+  if (!isPublic && !isAuthed) return { name: "login" };
+  if (isAuthed && to.name === "login") return { name: "dashboard" };
+  return true;
+});
+
+router.afterEach((to, from) => {
+  if (!store.getters.isAuthenticated) return;
+  if (to.name === from.name) return;
+  const title = typeof to.name === "string" ? to.name : to.path;
+  store.commit("addActivity", { type: "nav", label: `Navegó a ${title}` });
 });
 
 export default router;

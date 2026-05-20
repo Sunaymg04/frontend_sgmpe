@@ -14,10 +14,13 @@
     </v-btn>
 
     <!-- Usuario -->
-    <div class="ml-3 text-white">
-      <div class="text-subtitle-2">{{ name }}</div>
-      <div class="text-caption">{{ role }}</div>
-    </div>
+    <v-btn class="ml-2 user-btn" variant="text" @click="$emit('open-profile')">
+      <div class="text-left text-white">
+        <div class="text-subtitle-2">{{ name }}</div>
+        <div class="text-caption opacity-90">{{ role }}</div>
+      </div>
+      <v-icon class="ml-2" size="18">mdi-chevron-down</v-icon>
+    </v-btn>
   </v-app-bar>
 </template>
 
@@ -29,6 +32,7 @@ export default {
     name: String,
     role: String,
   },
+  emits: ["open-profile"],
 };
 </script>
 <style scoped>
@@ -36,5 +40,10 @@ export default {
   background: linear-gradient(to bottom, #1d4ed8, #3b82f6);
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+.user-btn {
+  text-transform: none;
+  letter-spacing: normal;
+  border-radius: 14px;
 }
 </style>

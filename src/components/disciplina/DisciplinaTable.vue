@@ -8,7 +8,7 @@
     >
       <template v-slot:[`item.curriculos`]="{ item }">
         <v-chip
-          v-for="c in item.curriculos"
+          v-for="c in item.nombresCurriculos"
           :key="c"
           class="ma-1"
           color="primary"
@@ -93,7 +93,7 @@ export default {
 
           return {
             ...d,
-            curriculos: nombresCurriculos,
+            nombresCurriculos,
           };
         });
 
@@ -115,7 +115,7 @@ export default {
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
-.modern-table :depp(th) {
+.modern-table :deep(th) {
   font-weight: 700;
   color: #0f172a;
   font-size: 13.5px;

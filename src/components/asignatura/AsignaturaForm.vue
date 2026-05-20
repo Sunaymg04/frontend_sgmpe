@@ -9,7 +9,7 @@
       <v-card-title class="text-h5 font-weight-bold d-flex align-center">
         <v-icon class="mr-2" color="primary"> mdi-book-education </v-icon>
 
-        Crear Asignatura
+        {{ form.id ? "Editar Asignatura" : "Crear Asignatura" }}
       </v-card-title>
 
       <!-- Form -->
@@ -87,9 +87,10 @@ import api from "@/services/api";
 export default {
   props: {
     modelValue: Boolean,
+    asignatura: Object,
   },
 
-  emits: ["update:modelValue", "guardado", "error"],
+  emits: ["update:modelValue", "guardado", "error", "cerrado"],
 
   data() {
     return {
@@ -98,6 +99,7 @@ export default {
       aniosAcademicos: [],
 
       form: {
+        id: null,
         nombre: "",
         fondo_tiempo: "",
         id_disciplina: [],
@@ -114,6 +116,35 @@ export default {
 
       set(value) {
         this.$emit("update:modelValue", value);
+      },
+    },
+  },
+  watch: {
+    asignatura: {
+      immediate: true,
+
+      handler(valor) {
+        if (valor) {
+          this.form = {
+            id: valor.id,
+
+            nombre: valor.nombre,
+
+            fondo_tiempo: valor.fondo_tiempo,
+
+            // disciplinas
+
+            id_disciplina: Array.isArray(valor.disciplinas)
+              ? valor.disciplinas.map((d) => Number(d.id))
+              : [],
+
+            // años académicos
+
+            id_a_academico: Array.isArray(valor.anios_academicos)
+              ? valor.anios_academicos.map((a) => Number(a.id))
+              : [],
+          };
+        }
       },
     },
   },
@@ -144,17 +175,32 @@ export default {
 
     async guardar() {
       try {
-        await api.post("/asignatura", this.form);
+        // EDITAR
+
+        if (this.form.id) {
+          await api.put(`/asignatura/${this.form.id}`, this.form);
+        }
+
+        // CREAR
+        else {
+          await api.post("/asignatura", this.form);
+        }
 
         this.cerrar();
 
         this.$nextTick(() => {
-          this.$emit("guardado", "Asignatura creada correctamente");
+          this.$emit(
+            "guardado",
+
+            this.form.id
+              ? "Asignatura actualizada correctamente"
+              : "Asignatura creada correctamente"
+          );
         });
       } catch (error) {
         console.error(error);
 
-        this.$emit("error", "No se pudo crear la asignatura");
+        this.$emit("error", "No se pudo guardar la asignatura");
       }
     },
 
@@ -162,11 +208,13 @@ export default {
       this.dialog = false;
 
       this.form = {
+        id: null,
         nombre: "",
         fondo_tiempo: "",
         id_disciplina: [],
         id_a_academico: [],
       };
+      this.$emit("cerrado");
     },
   },
 

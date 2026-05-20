@@ -97,7 +97,7 @@ export default {
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
-.modern-table :depp(th) {
+.modern-table :deep(th) {
   font-weight: 700;
   color: #0f172a;
   font-size: 13.5px;
