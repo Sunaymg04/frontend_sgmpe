@@ -5,10 +5,11 @@
       <AppSidebar v-model="drawer" />
     </template>
 
-    <v-main>
-      <v-container>
+    <v-main :class="{ 'public-main': !showShell }">
+      <v-container v-if="showShell">
         <router-view />
       </v-container>
+      <router-view v-else />
     </v-main>
 
     <v-dialog v-model="profileOpen" width="560" class="profile-dialog">
@@ -154,6 +155,9 @@ export default {
 <style>
 body {
   background: #f1f5f9;
+}
+.public-main {
+  min-height: 100vh;
 }
 .main-content {
   padding: 20px;

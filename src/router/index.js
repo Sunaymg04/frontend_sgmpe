@@ -5,6 +5,7 @@ import AsignaturaListView from "../views/asignatura/AsignaturaListView.vue";
 import CurriculoListView from "../views/curriculo/CurriculoListView.vue";
 import DisciplinaListView from "../views/disciplina/DisciplinaListView";
 import LoginView from "../views/LoginView.vue";
+import PlanEstudioListView from "../views/planEstudio/PlanEstudioListView.vue";
 
 import EstructuraCurricularViews from "../views/EstructuraCurricularViews.vue";
 import store from "../store";
@@ -29,6 +30,11 @@ const routes = [
     path: "/curriculo",
     name: "curriculo",
     component: CurriculoListView,
+  },
+  {
+    path: "/plan_estudio",
+    name: "plan_estudio",
+    component: PlanEstudioListView,
   },
 
   {
@@ -60,7 +66,10 @@ const router = createRouter({
 router.beforeEach((to) => {
   const isPublic = Boolean(to.meta?.public);
   const isAuthed = store.getters.isAuthenticated;
-  if (!isPublic && !isAuthed) return { name: "login" };
+  if (!isPublic && !isAuthed) {
+    store.dispatch("logout");
+    return { name: "login" };
+  }
   if (isAuthed && to.name === "login") return { name: "dashboard" };
   return true;
 });

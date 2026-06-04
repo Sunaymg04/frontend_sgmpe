@@ -1,5 +1,21 @@
 <template>
-  <v-navigation-drawer v-model="drawer" class="modern-sidebar" elevation="0">
+  <v-navigation-drawer
+    v-model="drawer"
+    class="modern-sidebar"
+    elevation="0"
+    permanent
+    width="292"
+  >
+    <div class="sidebar-head">
+      <div class="sidebar-mark">
+        <v-icon>mdi-school-outline</v-icon>
+      </div>
+      <div>
+        <div class="sidebar-title">SGMPE</div>
+        <div class="sidebar-subtitle">Menú principal</div>
+      </div>
+    </div>
+
     <v-list nav density="comfortable">
       <v-list-item
         prepend-icon="mdi-view-dashboard"
@@ -13,6 +29,13 @@
         title="Estructura Curricular"
         class="modern-item"
         to="/estructura_curricular"
+      />
+
+      <v-list-item
+        prepend-icon="mdi-file-document-edit-outline"
+        title="Plan de estudio"
+        class="modern-item"
+        to="/plan_estudio"
       />
     </v-list>
   </v-navigation-drawer>
@@ -43,9 +66,32 @@ export default {
 <style scoped>
 .modern-sidebar {
   border-right: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: white;
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+  background: #ffffff !important;
+  color: #1e293b;
+  box-shadow: 4px 0 20px rgba(15, 23, 42, 0.06);
+}
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 12px;
+}
+.sidebar-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+.sidebar-title {
+  font-weight: 800;
+  color: #0f172a;
+}
+.sidebar-subtitle {
+  color: #64748b;
+  font-size: 12px;
 }
 .modern-item {
   border-radius: 10px;

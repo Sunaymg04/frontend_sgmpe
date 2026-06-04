@@ -2,13 +2,29 @@ import { createStore } from "vuex";
 
 const STORAGE_KEY = "gpe_auth";
 const APPLICATION_CODE = "gestion_plan_estudio";
+const VALID_ROLES = [
+  "admin",
+  "jefe_departamento",
+  "decano",
+  "rector",
+  "vicedecano_docente",
+];
 const ACTIVITY_MAX = 30;
 
 function loadPersistedAuth() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    const access = Array.isArray(parsed?.access) ? parsed.access : [];
+    const hasValidRole = access.some(
+      (item) => item?.active && VALID_ROLES.includes(item?.role)
+    );
+    if (!hasValidRole) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -22,6 +38,21 @@ function persistAuth(payload) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
+async function getApplicationAccess({ username, api, usersApi }) {
+  const endpoint = `/users/${encodeURIComponent(username)}/access`;
+  const config = { params: { application: APPLICATION_CODE } };
+
+  if (api) {
+    try {
+      return await api.get(endpoint, config);
+    } catch (error) {
+      if (!usersApi) throw error;
+    }
+  }
+
+  return usersApi.get(endpoint, config);
+}
+
 export default createStore({
   state: {
     auth: loadPersistedAuth(),
@@ -29,7 +60,13 @@ export default createStore({
   },
   getters: {
     isAuthenticated(state) {
-      return Boolean(state.auth?.username);
+      const access = Array.isArray(state.auth?.access) ? state.auth.access : [];
+      return Boolean(
+        state.auth?.username &&
+          access.some(
+            (item) => item?.active && VALID_ROLES.includes(item?.role)
+          )
+      );
     },
     authUsername(state) {
       return state.auth?.username ?? "";
@@ -81,12 +118,7 @@ export default createStore({
         throw new Error("Credenciales inválidas.");
       }
 
-      const accessRes = await api.get(
-        `/users/${encodeURIComponent(username)}/access`,
-        {
-          params: { application: APPLICATION_CODE },
-        }
-      );
+      const accessRes = await getApplicationAccess({ username, api, usersApi });
 
       if (!accessRes?.data?.can_access) {
         throw new Error(
@@ -97,7 +129,7 @@ export default createStore({
       const access = Array.isArray(accessRes?.data?.access)
         ? accessRes.data.access
         : [];
-      if (!access.some((a) => a?.active)) {
+      if (!access.some((a) => a?.active && VALID_ROLES.includes(a?.role))) {
         throw new Error(
           "No tiene roles activos para la aplicación. Contacte al administrador."
         );
