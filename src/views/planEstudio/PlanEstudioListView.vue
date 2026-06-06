@@ -342,6 +342,15 @@ export default {
       if (Array.isArray(payload?.data)) return payload.data;
       return [];
     },
+    normalizeModalidades(payload) {
+      if (Array.isArray(payload?.data?.modalidades)) {
+        return payload.data.modalidades;
+      }
+      if (Array.isArray(payload?.modalidades)) {
+        return payload.modalidades;
+      }
+      return this.normalizeList(payload);
+    },
     async getFirst(endpoints) {
       let lastError;
       for (const endpoint of endpoints) {
@@ -369,9 +378,9 @@ export default {
         const [planRes, progRes, modRes, calRes, cursoRes] = await Promise.all([
           api.get("/plan_estudio"),
           api.get("/progForm").catch(() => ({ data: [] })),
-          this.getFirst(["/modalidad_carrera", "/modalidadCarrera"]).catch(
-            () => ({ data: [] })
-          ),
+          this.getFirst(["/modalidad", "/modalidad_carrera"]).catch(() => ({
+            data: [],
+          })),
           api.get("/calificacion").catch(() => ({ data: [] })),
           api.get("/curso").catch(() => ({ data: [] })),
         ]);
@@ -505,7 +514,7 @@ export default {
           `/progForm/${this.form.id_prog_form}/modalidades`,
           `/programa/${this.form.id_prog_form}/modalidades`,
         ]);
-        this.modalidades = this.normalizeList(modalidadesRes.data);
+        this.modalidades = this.normalizeModalidades(modalidadesRes.data);
       } catch (error) {
         try {
           await this.cargarModalidadesFallback();
@@ -520,12 +529,8 @@ export default {
     },
     async cargarModalidadesFallback() {
       const [relRes, modRes] = await Promise.all([
-        this.getFirst([
-          "/prog_form_modalidad_carrera",
-          "/progFormModalidadCarrera",
-          "/programa_modalidad",
-        ]),
-        this.getFirst(["/modalidad_carrera", "/modalidadCarrera"]),
+        this.getFirst(["/progFormMod", "/prog_form_modalidad_carrera"]),
+        this.getFirst(["/modalidad", "/modalidad_carrera"]),
       ]);
       const relaciones = this.normalizeList(relRes.data).filter(
         (item) => Number(item.id_prog_form) === Number(this.form.id_prog_form)

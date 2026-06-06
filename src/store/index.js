@@ -11,31 +11,8 @@ const VALID_ROLES = [
 ];
 const ACTIVITY_MAX = 30;
 
-function loadPersistedAuth() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const access = Array.isArray(parsed?.access) ? parsed.access : [];
-    const hasValidRole = access.some(
-      (item) => item?.active && VALID_ROLES.includes(item?.role)
-    );
-    if (!hasValidRole) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function persistAuth(payload) {
-  if (!payload) {
-    localStorage.removeItem(STORAGE_KEY);
-    return;
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+function clearPersistedAuth() {
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 async function getApplicationAccess({ username, api, usersApi }) {
@@ -53,9 +30,11 @@ async function getApplicationAccess({ username, api, usersApi }) {
   return usersApi.get(endpoint, config);
 }
 
+clearPersistedAuth();
+
 export default createStore({
   state: {
-    auth: loadPersistedAuth(),
+    auth: null,
     recentActivity: [],
   },
   getters: {
@@ -86,11 +65,10 @@ export default createStore({
   mutations: {
     setAuth(state, payload) {
       state.auth = payload;
-      persistAuth(payload);
     },
     clearAuth(state) {
       state.auth = null;
-      persistAuth(null);
+      clearPersistedAuth();
     },
     addActivity(state, payload) {
       const activity = {
@@ -109,13 +87,23 @@ export default createStore({
   },
   actions: {
     async login({ commit }, { username, password, usersApi, api }) {
-      const validateRes = await usersApi.post("/users/validate", {
-        username,
-        password,
-      });
+      let validateRes;
+
+      try {
+        validateRes = await usersApi.post("/users/validate", {
+          username,
+          password,
+        });
+      } catch (error) {
+        if (error?.response?.status === 401) {
+          throw new Error("Usuario o contraseña incorrectos.");
+        }
+
+        throw error;
+      }
 
       if (!validateRes?.data?.valid) {
-        throw new Error("Credenciales inválidas.");
+        throw new Error("Usuario o contraseña incorrectos.");
       }
 
       const accessRes = await getApplicationAccess({ username, api, usersApi });

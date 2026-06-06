@@ -1,8 +1,15 @@
 <template>
   <v-app>
     <template v-if="showShell">
-      <AppNavbar :name="name" :role="role" @open-profile="profileOpen = true" />
-      <AppSidebar v-model="drawer" />
+      <AppNavbar
+        :name="name"
+        :role="role"
+        :department="departmentName"
+        :sidebar-collapsed="sidebarCollapsed"
+        @toggle-sidebar="toggleSidebar"
+        @open-profile="profileOpen = true"
+      />
+      <AppSidebar v-model="drawer" :collapsed="sidebarCollapsed" />
     </template>
 
     <v-main :class="{ 'public-main': !showShell }">
@@ -30,6 +37,9 @@
           <div class="text-subtitle-1 font-weight-bold">{{ name }}</div>
           <div class="text-body-2 text-medium-emphasis">
             {{ role || "Sin rol" }}
+          </div>
+          <div v-if="departmentName" class="text-body-2 text-medium-emphasis">
+            {{ departmentName }}
           </div>
         </v-card>
 
@@ -96,6 +106,7 @@
 <script>
 import AppNavbar from "@/components/AppNavbar.vue";
 import AppSidebar from "@/components/AppSidebar.vue";
+import api from "@/services/api";
 import { Toaster } from "vue-sonner";
 export default {
   name: "App",
@@ -109,8 +120,10 @@ export default {
   data() {
     return {
       drawer: true,
+      sidebarCollapsed: false,
       profileOpen: false,
       showMe: false,
+      departmentName: "",
     };
   },
   computed: {
@@ -121,15 +134,24 @@ export default {
       const username = this.$store.getters.authUsername;
       return username || "Usuario";
     },
+    currentAccess() {
+      const access = this.$store.getters.authAccess || [];
+      return access.find((item) => item?.active) || null;
+    },
     role() {
-      const role = this.$store.getters.primaryRole;
-      return role || "";
+      return this.formatRole(this.currentAccess?.role);
+    },
+    departmentId() {
+      return this.currentAccess?.departamento_id ?? null;
     },
     recentActivity() {
       return this.$store.getters.recentActivity || [];
     },
   },
   methods: {
+    toggleSidebar() {
+      this.sidebarCollapsed = !this.sidebarCollapsed;
+    },
     logout() {
       this.profileOpen = false;
       this.showMe = false;
@@ -144,10 +166,52 @@ export default {
         return iso;
       }
     },
+    formatRole(role) {
+      const normalized = String(role || "").trim();
+      const labels = {
+        admin: "Administrador",
+        jefe_departamento: "Jefe de Departamento",
+        jefe_deparatamento: "Jefe de Departamento",
+        decano: "Decano",
+        rector: "Rector",
+        vicedecano_docente: "Vicedecano Docente",
+      };
+
+      if (labels[normalized]) {
+        return labels[normalized];
+      }
+
+      if (!normalized) {
+        return "";
+      }
+
+      return normalized
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    },
+    async loadDepartmentName(departmentId) {
+      if (!departmentId) {
+        this.departmentName = "";
+        return;
+      }
+
+      try {
+        const response = await api.get(`/departamento/${departmentId}`);
+        this.departmentName = response?.data?.data?.nombre || "";
+      } catch {
+        this.departmentName = "";
+      }
+    },
   },
   watch: {
     profileOpen(open) {
       if (!open) this.showMe = false;
+    },
+    departmentId: {
+      immediate: true,
+      handler(value) {
+        this.loadDepartmentName(value);
+      },
     },
   },
 };

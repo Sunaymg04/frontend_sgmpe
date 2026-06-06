@@ -281,6 +281,17 @@ export default {
       if (Array.isArray(payload?.data)) return payload.data;
       return [];
     },
+    getFriendlyLoginError(error) {
+      if (error?.response?.status === 401) {
+        return "Usuario o contraseña incorrectos.";
+      }
+
+      if (error?.message === "Credenciales inválidas.") {
+        return "Usuario o contraseña incorrectos.";
+      }
+
+      return error?.message || "No fue posible iniciar sesión.";
+    },
     departmentTitle(item) {
       if (!item) return "";
       const faculty =
@@ -320,7 +331,7 @@ export default {
         });
         this.$router.replace({ name: "dashboard" });
       } catch (e) {
-        this.error = e?.message || "No fue posible iniciar sesión.";
+        this.error = this.getFriendlyLoginError(e);
       } finally {
         this.loading = false;
       }
@@ -386,8 +397,7 @@ export default {
         await this.loadDepartments();
       } catch (e) {
         this.adminMessageType = "error";
-        this.adminMessage =
-          e?.message || "No fue posible validar al administrador.";
+        this.adminMessage = this.getFriendlyLoginError(e);
       } finally {
         this.adminLoading = false;
       }
@@ -570,7 +580,7 @@ export default {
         };
         this.adminMessageType = "success";
         this.adminMessage =
-          "Jefe de departamento asignado. Si ya existía uno para ese departamento, la API debe dejar activo solo el nuevo acceso.";
+          "Jefe de Departamento asignado. Si ya existía uno para ese departamento se dejará activo solo el nuevo acceso";
       } catch (e) {
         this.adminMessageType = "error";
         this.adminMessage =
