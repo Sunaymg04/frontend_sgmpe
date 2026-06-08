@@ -70,7 +70,9 @@ export default {
       headers: [
         { title: "Código", key: "id" },
         { title: "Nombre de la asignatura", key: "nombre" },
-        { title: "Fondo de tiempo", key: "fondo_tiempo" },
+        { title: "Total", key: "fondo_tiempo" },
+        { title: "Clase", key: "horas_clase" },
+        { title: "Práctica laboral", key: "horas_practica_laboral" },
         { title: "Disciplina", key: "disciplinas" },
         { title: "Año / Programa de Formación", key: "anoPrograma" },
         { title: "Acciones", key: "acciones", sortable: false },

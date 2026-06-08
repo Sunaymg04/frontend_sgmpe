@@ -27,15 +27,17 @@
             class="mb-4"
           />
 
-          <!-- Fondo tiempo -->
+          <!-- Fondo tiempo calculado -->
           <v-text-field
-            v-model="form.fondo_tiempo"
-            label="Fondo de tiempo"
+            :model-value="fondoTiempoCalculado"
+            label="Fondo de tiempo calculado"
             type="number"
             variant="outlined"
             rounded="lg"
             prepend-inner-icon="mdi-timer-outline"
             class="mb-4"
+            readonly
+            disabled
           />
 
           <!-- Curriculo -->
@@ -86,7 +88,7 @@ export default {
       form: {
         id: null,
         nombre: "",
-        fondo_tiempo: "",
+        fondo_tiempo: 0,
         id_curriculo: [],
       },
     };
@@ -102,6 +104,9 @@ export default {
         this.$emit("update:modelValue", value);
       },
     },
+    fondoTiempoCalculado() {
+      return Number(this.form.fondo_tiempo || 0);
+    },
   },
   watch: {
     disciplina: {
@@ -114,7 +119,7 @@ export default {
 
             nombre: valor.nombre,
 
-            fondo_tiempo: valor.fondo_tiempo,
+            fondo_tiempo: Number(valor.fondo_tiempo || 0),
 
             id_curriculo: Array.isArray(valor.curriculos)
               ? valor.curriculos.map((c) => Number(c.id))
@@ -141,12 +146,15 @@ export default {
         // EDITAR
 
         if (this.form.id) {
-          await api.put(`/disciplina/${this.form.id}`, this.form);
+          await api.put(
+            `/disciplina/${this.form.id}`,
+            this.disciplinaPayload()
+          );
         }
 
         // CREAR
         else {
-          await api.post("/disciplina", this.form);
+          await api.post("/disciplina", this.disciplinaPayload());
         }
 
         this.cerrar();
@@ -173,10 +181,17 @@ export default {
       this.form = {
         id: null,
         nombre: "",
-        fondo_tiempo: "",
+        fondo_tiempo: 0,
         id_curriculo: [],
       };
       this.$emit("cerrado");
+    },
+    disciplinaPayload() {
+      return {
+        id: this.form.id,
+        nombre: this.form.nombre,
+        id_curriculo: this.form.id_curriculo,
+      };
     },
   },
 

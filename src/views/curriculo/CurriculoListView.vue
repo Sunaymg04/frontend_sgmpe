@@ -107,6 +107,7 @@ export default {
 
       try {
         this.eliminando = true;
+        const nombre = this.curriculoEliminar.nombre;
         await api.delete(`/curriculo/${this.curriculoEliminar.id}`);
 
         this.dialogEliminar = false;
@@ -117,6 +118,7 @@ export default {
           description: "El currículo fue eliminado correctamente",
           duration: 4000,
         });
+        this.registrarActividad(`Eliminó el currículo ${nombre}`);
       } catch (error) {
         console.error(error);
         toast.error("No se pudo eliminar", {
@@ -145,6 +147,7 @@ export default {
 
         duration: 4000,
       });
+      this.registrarActividad(mensaje);
     },
 
     mostrarError(mensaje) {
@@ -152,6 +155,12 @@ export default {
         description: "Ocurrió un problema al guardar",
 
         duration: 4000,
+      });
+    },
+    registrarActividad(label) {
+      this.$store.dispatch("registerActivity", {
+        type: "curriculo",
+        label,
       });
     },
   },

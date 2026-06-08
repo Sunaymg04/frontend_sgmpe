@@ -86,6 +86,9 @@ export default createStore({
     },
   },
   actions: {
+    registerActivity({ commit }, payload) {
+      commit("addActivity", payload);
+    },
     async login({ commit }, { username, password, usersApi, api }) {
       let validateRes;
 
@@ -130,7 +133,10 @@ export default createStore({
       });
 
       commit("clearActivity");
-      commit("addActivity", { type: "auth", label: "Inicio de sesión" });
+      commit("addActivity", {
+        type: "auth",
+        label: `Inicio de sesión de ${username}`,
+      });
     },
     logout({ commit }) {
       commit("clearAuth");

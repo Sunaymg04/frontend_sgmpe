@@ -100,6 +100,7 @@ export default {
 
         duration: 4000,
       });
+      this.registrarActividad(mensaje);
     },
 
     mostrarError(mensaje) {
@@ -126,6 +127,7 @@ export default {
 
       try {
         this.eliminando = true;
+        const nombre = this.asignaturaEliminar.nombre;
         await api.delete(`/asignatura/${this.asignaturaEliminar.id}`);
 
         this.dialogEliminar = false;
@@ -136,6 +138,7 @@ export default {
           description: "La asignatura fue eliminada correctamente",
           duration: 4000,
         });
+        this.registrarActividad(`Eliminó la asignatura ${nombre}`);
       } catch (error) {
         console.error(error);
         toast.error("No se pudo eliminar", {
@@ -151,6 +154,12 @@ export default {
       if (this.eliminando) return;
       this.dialogEliminar = false;
       this.asignaturaEliminar = null;
+    },
+    registrarActividad(label) {
+      this.$store.dispatch("registerActivity", {
+        type: "asignatura",
+        label,
+      });
     },
   },
 };

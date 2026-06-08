@@ -99,6 +99,7 @@ export default {
 
         duration: 4000,
       });
+      this.registrarActividad(mensaje);
     },
     mostrarError(mensaje) {
       toast.error(mensaje, {
@@ -124,6 +125,7 @@ export default {
 
       try {
         this.eliminando = true;
+        const nombre = this.disciplinaEliminar.nombre;
         await api.delete(`/disciplina/${this.disciplinaEliminar.id}`);
 
         this.dialogEliminar = false;
@@ -134,6 +136,7 @@ export default {
           description: "La disciplina fue eliminada correctamente",
           duration: 4000,
         });
+        this.registrarActividad(`Eliminó la disciplina ${nombre}`);
       } catch (error) {
         console.error(error);
         toast.error("No se pudo eliminar", {
@@ -149,6 +152,12 @@ export default {
       if (this.eliminando) return;
       this.dialogEliminar = false;
       this.disciplinaEliminar = null;
+    },
+    registrarActividad(label) {
+      this.$store.dispatch("registerActivity", {
+        type: "disciplina",
+        label,
+      });
     },
   },
 };

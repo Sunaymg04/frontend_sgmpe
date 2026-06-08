@@ -56,7 +56,7 @@
         <v-expand-transition>
           <div v-if="showMe" class="mt-4">
             <div class="text-subtitle-2 font-weight-bold mb-2">
-              Actividad reciente
+              Actividad administrativa
             </div>
             <v-card class="pa-3 rounded-xl profile-activity" elevation="0">
               <div v-if="recentActivity.length === 0" class="text-body-2">

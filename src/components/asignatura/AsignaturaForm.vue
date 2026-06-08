@@ -25,16 +25,46 @@
             class="mb-4"
           />
 
-          <!-- Fondo tiempo -->
-          <v-text-field
-            v-model="form.fondo_tiempo"
-            label="Fondo de tiempo"
-            type="number"
-            variant="outlined"
-            rounded="lg"
-            prepend-inner-icon="mdi-timer-outline"
-            class="mb-4"
-          />
+          <!-- Cantidad de horas -->
+          <v-row>
+            <v-col cols="12" md="4">
+              <v-text-field
+                :model-value="fondoTiempoTotal"
+                label="Fondo de tiempo"
+                type="number"
+                variant="outlined"
+                rounded="lg"
+                prepend-inner-icon="mdi-timer-outline"
+                class="mb-4"
+                readonly
+                disabled
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model.number="form.horas_clase"
+                label="Horas clase"
+                type="number"
+                min="0"
+                variant="outlined"
+                rounded="lg"
+                prepend-inner-icon="mdi-school-outline"
+                class="mb-4"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model.number="form.horas_practica_laboral"
+                label="Práctica laboral"
+                type="number"
+                min="0"
+                variant="outlined"
+                rounded="lg"
+                prepend-inner-icon="mdi-briefcase-outline"
+                class="mb-4"
+              />
+            </v-col>
+          </v-row>
 
           <!-- Disciplinas -->
           <v-select
@@ -63,6 +93,8 @@
             multiple
             chips
             class="mb-4"
+            :loading="loadingAnios"
+            :disabled="loadingAnios"
           />
         </v-form>
       </v-card-text>
@@ -97,11 +129,14 @@ export default {
       disciplinas: [],
 
       aniosAcademicos: [],
+      loadingAnios: false,
 
       form: {
         id: null,
         nombre: "",
         fondo_tiempo: "",
+        horas_clase: 0,
+        horas_practica_laboral: 0,
         id_disciplina: [],
         id_a_academico: [],
       },
@@ -118,6 +153,21 @@ export default {
         this.$emit("update:modelValue", value);
       },
     },
+    authAccess() {
+      return this.$store.getters.authAccess || [];
+    },
+    departmentId() {
+      const jefe = this.authAccess.find(
+        (item) => item?.active && item?.role === "jefe_departamento"
+      );
+      return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
+    },
+    fondoTiempoTotal() {
+      return (
+        Number(this.form.horas_clase || 0) +
+        Number(this.form.horas_practica_laboral || 0)
+      );
+    },
   },
   watch: {
     asignatura: {
@@ -131,6 +181,11 @@ export default {
             nombre: valor.nombre,
 
             fondo_tiempo: valor.fondo_tiempo,
+            horas_clase:
+              valor.horas_clase !== undefined
+                ? Number(valor.horas_clase || 0)
+                : Number(valor.fondo_tiempo || 0),
+            horas_practica_laboral: Number(valor.horas_practica_laboral || 0),
 
             // disciplinas
 
@@ -161,16 +216,55 @@ export default {
     },
 
     async obtenerAniosAcademicos() {
+      this.loadingAnios = true;
       try {
-        const res = await api.get("/a_academico");
+        if (!this.departmentId) {
+          await this.obtenerTodosLosAniosAcademicos();
+          return;
+        }
 
-        this.aniosAcademicos = res.data.data.map((a) => ({
-          ...a,
-          nombre_completo: `${a.identificador} - ${a.programa_formacion.nombre}`,
-        }));
+        const [carrerasRes, aniosRes] = await Promise.all([
+          api.get(`/departamento/${this.departmentId}/carreras`),
+          api.get("/a_academico"),
+        ]);
+
+        const carreras = this.normalizeList(carrerasRes.data);
+        const programasPorId = carreras.reduce((acc, carrera) => {
+          acc[Number(carrera.id)] = carrera.nombre;
+          return acc;
+        }, {});
+        const idsProgramas = Object.keys(programasPorId).map(Number);
+
+        this.aniosAcademicos = this.normalizeList(aniosRes.data)
+          .filter((anio) => idsProgramas.includes(Number(anio.id_prog_form)))
+          .map((a) => ({
+            ...a,
+            nombre_completo: `${a.identificador} - ${
+              programasPorId[Number(a.id_prog_form)] ||
+              a.programa_formacion?.nombre ||
+              "Programa de formación"
+            }`,
+          }));
       } catch (error) {
         console.error(error);
+      } finally {
+        this.loadingAnios = false;
       }
+    },
+
+    async obtenerTodosLosAniosAcademicos() {
+      const res = await api.get("/a_academico");
+
+      this.aniosAcademicos = this.normalizeList(res.data).map((a) => ({
+        ...a,
+        nombre_completo: `${a.identificador} - ${a.programa_formacion.nombre}`,
+      }));
+    },
+
+    normalizeList(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
     },
 
     async guardar() {
@@ -178,12 +272,15 @@ export default {
         // EDITAR
 
         if (this.form.id) {
-          await api.put(`/asignatura/${this.form.id}`, this.form);
+          await api.put(
+            `/asignatura/${this.form.id}`,
+            this.asignaturaPayload()
+          );
         }
 
         // CREAR
         else {
-          await api.post("/asignatura", this.form);
+          await api.post("/asignatura", this.asignaturaPayload());
         }
 
         this.cerrar();
@@ -211,10 +308,20 @@ export default {
         id: null,
         nombre: "",
         fondo_tiempo: "",
+        horas_clase: 0,
+        horas_practica_laboral: 0,
         id_disciplina: [],
         id_a_academico: [],
       };
       this.$emit("cerrado");
+    },
+    asignaturaPayload() {
+      return {
+        ...this.form,
+        fondo_tiempo: this.fondoTiempoTotal,
+        horas_clase: Number(this.form.horas_clase || 0),
+        horas_practica_laboral: Number(this.form.horas_practica_laboral || 0),
+      };
     },
   },
 

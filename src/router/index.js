@@ -74,11 +74,4 @@ router.beforeEach((to) => {
   return true;
 });
 
-router.afterEach((to, from) => {
-  if (!store.getters.isAuthenticated) return;
-  if (to.name === from.name) return;
-  const title = typeof to.name === "string" ? to.name : to.path;
-  store.commit("addActivity", { type: "nav", label: `Navegó a ${title}` });
-});
-
 export default router;
