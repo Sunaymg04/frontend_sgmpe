@@ -150,11 +150,12 @@ export default {
 }
 
 .modern-sidebar.collapsed .sidebar-list :deep(.v-list-item) {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  min-height: 56px;
-  width: 56px;
+  min-height: 58px;
+  width: 58px;
+  height: 58px;
   margin: 6px auto;
   padding-inline: 0 !important;
   border-radius: 16px;
@@ -162,11 +163,20 @@ export default {
 }
 
 .modern-sidebar.collapsed .sidebar-list :deep(.v-list-item__prepend) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  margin-inline: 0;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.modern-sidebar.collapsed .sidebar-list :deep(.v-list-item__prepend > .v-icon) {
+  margin: 0 !important;
+}
+
+.modern-sidebar.collapsed .sidebar-list :deep(.v-list-item__spacer) {
+  display: none;
 }
 
 .modern-sidebar.collapsed .modern-item:hover {
@@ -186,8 +196,6 @@ export default {
 }
 
 .modern-sidebar.collapsed .modern-item.v-list-item--active {
-  display: grid;
-  place-items: center;
   background: linear-gradient(
     135deg,
     rgba(37, 99, 235, 0.16),

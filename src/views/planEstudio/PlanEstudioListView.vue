@@ -59,16 +59,38 @@
           {{ getNestedName(item, ["curso", "curso_nombre"]) }}
         </template>
 
-        <template v-slot:[`item.acciones`]="{ item }">
-          <v-btn
-            icon
-            variant="text"
-            color="primary"
-            :loading="detalleLoading && planDetalle?.id === item.id"
-            @click="abrirDetalle(item)"
+        <template v-slot:[`item.estado`]="{ item }">
+          <v-chip
+            :color="estadoPlanColor(item)"
+            variant="tonal"
+            size="small"
+            class="font-weight-bold"
           >
-            <v-icon>mdi-eye-outline</v-icon>
-          </v-btn>
+            {{ estadoPlanLabel(item) }}
+          </v-chip>
+        </template>
+
+        <template v-slot:[`item.acciones`]="{ item }">
+          <div class="acciones-plan">
+            <v-btn
+              icon
+              variant="text"
+              color="primary"
+              :loading="detalleLoading && planDetalle?.id === item.id"
+              @click="abrirDetalle(item)"
+            >
+              <v-icon>mdi-eye-outline</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              color="secondary"
+              :disabled="saving"
+              @click="abrirModificar(item)"
+            >
+              <v-icon>mdi-file-document-edit-outline</v-icon>
+            </v-btn>
+          </div>
         </template>
       </v-data-table>
     </v-card>
@@ -77,9 +99,11 @@
       <v-card class="wizard-card">
         <div class="wizard-header">
           <div>
-            <div class="text-h6 font-weight-bold">Crear plan de estudio</div>
+            <div class="text-h6 font-weight-bold">
+              {{ wizardTitle }}
+            </div>
             <div class="text-body-2 text-medium-emphasis">
-              Complete la estructura desde la carrera hasta las asignaturas
+              {{ wizardSubtitle }}
             </div>
           </div>
           <v-btn icon variant="text" :disabled="saving" @click="cerrarCrear">
@@ -107,6 +131,16 @@
           class="mb-4"
         >
           {{ formError }}
+        </v-alert>
+
+        <v-alert
+          v-if="formNotice"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+          class="mb-4"
+        >
+          {{ formNotice }}
         </v-alert>
 
         <v-card-text class="px-0">
@@ -237,8 +271,11 @@
                   Estructura resultante
                 </div>
                 <div class="text-body-2 text-medium-emphasis">
-                  Las asignaturas se muestran agrupadas por currículo y
-                  disciplina.
+                  {{
+                    modoFormulario === "modificar"
+                      ? "Ajuste horas, agregue disciplinas y agregue asignaturas existentes o nuevas."
+                      : "Las asignaturas se muestran agrupadas por currículo y disciplina."
+                  }}
                 </div>
               </div>
             </div>
@@ -256,6 +293,16 @@
                     <v-chip size="small" color="primary" variant="tonal">
                       {{ curriculo.disciplinas.length }} disciplinas
                     </v-chip>
+                    <v-btn
+                      v-if="modoFormulario === 'modificar'"
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      @click.stop="agregarDisciplina(curriculo)"
+                    >
+                      <v-icon class="mr-1">mdi-plus</v-icon>
+                      Disciplina
+                    </v-btn>
                   </div>
                 </v-expansion-panel-title>
                 <v-expansion-panel-text>
@@ -268,8 +315,26 @@
                       <v-icon size="18" color="secondary">
                         mdi-book-open-page-variant
                       </v-icon>
-                      <strong>{{ disciplina.nombre }}</strong>
-                      <span>{{ disciplina.fondo_tiempo || 0 }} h</span>
+                      <v-text-field
+                        v-if="disciplina.is_new"
+                        v-model="disciplina.nombre"
+                        label="Nueva disciplina"
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                      />
+                      <strong v-else>{{ disciplina.nombre }}</strong>
+                      <span>{{ disciplinaTotalHoras(disciplina) }} h</span>
+                      <v-btn
+                        v-if="modoFormulario === 'modificar'"
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        @click="agregarAsignatura(disciplina)"
+                      >
+                        <v-icon class="mr-1">mdi-plus</v-icon>
+                        Asignatura
+                      </v-btn>
                     </div>
 
                     <div class="asignatura-list">
@@ -277,10 +342,83 @@
                         v-for="asignatura in disciplina.asignaturas"
                         :key="asignatura.id"
                         class="asignatura-row"
+                        :class="{
+                          'asignatura-row-editing':
+                            modoFormulario === 'modificar',
+                        }"
                       >
-                        <div>
+                        <div v-if="modoFormulario !== 'modificar'">
                           <strong>{{ asignatura.nombre }}</strong>
                           <span>{{ asignatura.fondo_tiempo || 0 }} h</span>
+                        </div>
+                        <div v-else class="asignatura-edit-grid">
+                          <template v-if="asignatura.is_new">
+                            <v-select
+                              v-model="asignatura.id_asignatura_existente"
+                              :items="asignaturasDisponibles"
+                              item-title="nombre"
+                              item-value="id"
+                              label="Asignatura existente"
+                              variant="outlined"
+                              density="compact"
+                              hide-details
+                              clearable
+                              @update:modelValue="
+                                onAsignaturaExistenteChange(asignatura)
+                              "
+                            />
+                            <v-text-field
+                              v-model="asignatura.nombre"
+                              label="Nueva asignatura"
+                              variant="outlined"
+                              density="compact"
+                              hide-details
+                              :disabled="!!asignatura.id_asignatura_existente"
+                            />
+                          </template>
+                          <strong v-else class="asignatura-name-readonly">
+                            {{ asignatura.nombre }}
+                          </strong>
+                          <v-text-field
+                            :model-value="asignaturaTotalHoras(asignatura)"
+                            label="Total"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            readonly
+                            disabled
+                          />
+                          <v-text-field
+                            v-model.number="asignatura.horas_clase"
+                            label="Clase"
+                            type="number"
+                            min="0"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                          />
+                          <v-text-field
+                            v-model.number="asignatura.horas_practica_laboral"
+                            label="Práctica laboral"
+                            type="number"
+                            min="0"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                          />
+                          <v-select
+                            v-if="asignatura.is_new"
+                            v-model="asignatura.id_a_academico"
+                            :items="aniosAcademicosPrograma"
+                            item-title="nombre_completo"
+                            item-value="id"
+                            label="Años"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            multiple
+                            chips
+                          />
                         </div>
                         <div class="anio-chip-list">
                           <v-chip
@@ -387,7 +525,7 @@
             Siguiente
           </v-btn>
           <v-btn v-else color="primary" :loading="saving" @click="guardarPlan">
-            Crear plan
+            {{ wizardSubmitLabel }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -432,6 +570,14 @@
                   {{ detallePrograma || "Programa de formación" }}
                 </strong>
                 <small>Plan de estudio</small>
+                <v-chip
+                  :color="estadoPlanColor(planDetalle)"
+                  variant="tonal"
+                  size="small"
+                  class="align-self-start font-weight-bold"
+                >
+                  {{ estadoPlanLabel(planDetalle) }}
+                </v-chip>
               </div>
               <div class="cover-meta">
                 <div>
@@ -478,6 +624,102 @@
               Este plan no tiene currículos asociados o aún no se pudo resolver
               su estructura.
             </v-alert>
+
+            <div v-if="detalleCambiosTieneDatos" class="changes-panel">
+              <div class="changes-title">
+                <v-icon color="secondary">mdi-compare-horizontal</v-icon>
+                <strong>Cambios propuestos</strong>
+              </div>
+
+              <div
+                v-for="cambio in detalleCambiosBase"
+                :key="`base-${cambio.campo}`"
+                class="change-line modified"
+              >
+                <span>{{ cambio.campo }}</span>
+                <small>
+                  {{ cambio.antes || "-" }} → {{ cambio.despues || "-" }}
+                </small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.asignaturas_agregadas || []"
+                :key="`asig-add-${item}`"
+                class="change-line added"
+              >
+                <span>Asignatura agregada</span>
+                <small>{{ item }}</small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.asignaturas_eliminadas || []"
+                :key="`asig-del-${item}`"
+                class="change-line removed"
+              >
+                <span>Asignatura eliminada</span>
+                <small>{{ item }}</small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.disciplinas_agregadas || []"
+                :key="`disc-add-${item}`"
+                class="change-line added"
+              >
+                <span>Disciplina agregada</span>
+                <small>{{ item }}</small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.disciplinas_eliminadas || []"
+                :key="`disc-del-${item}`"
+                class="change-line removed"
+              >
+                <span>Disciplina eliminada</span>
+                <small>{{ item }}</small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.disciplinas_modificadas || []"
+                :key="`disc-mod-${item.disciplina}`"
+                class="change-line modified"
+              >
+                <span>Disciplina modificada</span>
+                <small>
+                  {{ item.disciplina }}:
+                  {{ formatAsignaturaChanges(item.cambios) }}
+                </small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.curriculos_agregados || []"
+                :key="`cur-add-${item}`"
+                class="change-line added"
+              >
+                <span>Currículo agregado</span>
+                <small>{{ item }}</small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.curriculos_eliminados || []"
+                :key="`cur-del-${item}`"
+                class="change-line removed"
+              >
+                <span>Currículo eliminado</span>
+                <small>{{ item }}</small>
+              </div>
+
+              <div
+                v-for="item in detalleCambios.asignaturas_modificadas || []"
+                :key="`asig-mod-${item.asignatura}`"
+                class="change-line modified"
+              >
+                <span>Asignatura modificada</span>
+                <small>
+                  {{ item.asignatura }}:
+                  {{ formatAsignaturaChanges(item.cambios) }}
+                </small>
+              </div>
+            </div>
 
             <div
               v-for="curriculo in detalleCurriculos"
@@ -582,11 +824,16 @@ export default {
       calificaciones: [],
       cursos: [],
       curriculos: [],
+      asignaturasDisponibles: [],
+      aniosAcademicosPrograma: [],
       dialogCrear: false,
       dialogDetalle: false,
+      modoFormulario: "crear",
+      planOriginalModificacion: null,
       step: 1,
       steps: ["Datos base", "Currículos", "Estructura", "Resumen"],
       formError: "",
+      formNotice: "",
       detalleError: "",
       loadingPrograms: false,
       loadingModalities: false,
@@ -610,6 +857,7 @@ export default {
         { title: "Modalidad", key: "modalidad" },
         { title: "Calificación", key: "calificacion" },
         { title: "Curso", key: "curso" },
+        { title: "Estado", key: "estado" },
         { title: "Acciones", key: "acciones", sortable: false, align: "end" },
       ],
     };
@@ -685,6 +933,21 @@ export default {
       }
       return null;
     },
+    wizardTitle() {
+      return this.modoFormulario === "modificar"
+        ? "Modificar plan de estudio"
+        : "Crear plan de estudio";
+    },
+    wizardSubtitle() {
+      return this.modoFormulario === "modificar"
+        ? "Se creará una nueva propuesta a partir del plan seleccionado"
+        : "Complete la estructura desde la carrera hasta las asignaturas";
+    },
+    wizardSubmitLabel() {
+      return this.modoFormulario === "modificar"
+        ? "Guardar modificación"
+        : "Crear plan";
+    },
     curriculosSeleccionados() {
       return this.curriculos.filter((item) =>
         this.form.id_curriculo.includes(Number(item.id))
@@ -748,6 +1011,26 @@ export default {
       });
 
       return stats;
+    },
+    detalleCambios() {
+      return this.planDetalle?.modificacion?.resumen_cambios || null;
+    },
+    detalleCambiosBase() {
+      return this.detalleCambios?.datos_base || [];
+    },
+    detalleCambiosTieneDatos() {
+      if (!this.detalleCambios) return false;
+      return [
+        "datos_base",
+        "curriculos_agregados",
+        "curriculos_eliminados",
+        "disciplinas_agregadas",
+        "disciplinas_eliminadas",
+        "disciplinas_modificadas",
+        "asignaturas_agregadas",
+        "asignaturas_eliminadas",
+        "asignaturas_modificadas",
+      ].some((key) => (this.detalleCambios[key] || []).length > 0);
     },
   },
   methods: {
@@ -818,6 +1101,8 @@ export default {
             calificaciones[plan.id_calificacion]?.nombre || "",
           curso_nombre:
             cursos[plan.id_curso]?.nombre || cursos[plan.id_curso]?.curso || "",
+          estado: plan.estado || "esperando_aprobacion",
+          tipo_plan: plan.tipo_plan || "original",
         }));
       } catch (error) {
         console.error(error);
@@ -831,6 +1116,31 @@ export default {
         acc[item.id] = item;
         return acc;
       }, {});
+    },
+    estadoPlanLabel(plan) {
+      const estado = plan?.estado || "esperando_aprobacion";
+      const labels = {
+        esperando_aprobacion: "Esperando aprobación",
+        modificado_esperando_aprobacion: "Modificado esperando aprobación",
+        vigente: "Vigente",
+        rechazado: "Rechazado",
+      };
+      return labels[estado] || estado;
+    },
+    estadoPlanColor(plan) {
+      const estado = plan?.estado || "esperando_aprobacion";
+      const colors = {
+        esperando_aprobacion: "warning",
+        modificado_esperando_aprobacion: "secondary",
+        vigente: "success",
+        rechazado: "error",
+      };
+      return colors[estado] || "grey";
+    },
+    formatAsignaturaChanges(cambios = []) {
+      return cambios
+        .map((cambio) => `${cambio.campo}: ${cambio.antes} → ${cambio.despues}`)
+        .join("; ");
     },
     async abrirDetalle(plan) {
       this.dialogDetalle = true;
@@ -861,6 +1171,12 @@ export default {
         this.detalleCurriculos = curriculos.filter((curriculo) =>
           ids.includes(Number(curriculo.id))
         );
+
+        if (planData.modificacion?.estructura_snapshot?.estructura) {
+          this.detalleCurriculos = this.curriculosDesdeSnapshot(
+            planData.modificacion.estructura_snapshot.estructura
+          );
+        }
       } catch (error) {
         console.error(error);
         this.detalleError = "No fue posible cargar el detalle del plan.";
@@ -877,8 +1193,49 @@ export default {
     abrirCrear() {
       this.dialogCrear = true;
       this.resetForm();
+      this.modoFormulario = "crear";
       this.cargarProgramasDepartamento();
       this.cargarCursos();
+    },
+    async abrirModificar(plan) {
+      this.dialogCrear = true;
+      this.resetForm();
+      this.modoFormulario = "modificar";
+      this.planOriginalModificacion = plan;
+      this.formError = "";
+      this.formNotice = "";
+      this.loadingPrograms = true;
+
+      try {
+        const [planRes] = await Promise.all([
+          api.get(`/plan_estudio/${plan.id}`),
+          this.cargarProgramasDepartamento(),
+          this.cargarCursos(),
+        ]);
+
+        const planData = planRes?.data?.data || plan;
+        this.form.id_prog_form = Number(planData.id_prog_form);
+        this.form.id_modalidad = Number(planData.id_modalidad);
+        this.form.id_calificacion = Number(planData.id_calificacion);
+        this.form.id_curso = Number(planData.id_curso);
+
+        await Promise.all([
+          this.cargarModalidades(),
+          this.cargarCalificacion(),
+          this.cargarCurriculos(),
+          this.cargarCatalogosEstructura(),
+        ]);
+
+        this.form.id_curriculo = this.normalizeList(planData.curriculos).map(
+          (curriculo) => Number(curriculo.id)
+        );
+        this.curriculos = this.prepararEstructuraEditable(this.curriculos);
+      } catch (error) {
+        console.error(error);
+        this.formError = "No fue posible preparar la modificación del plan.";
+      } finally {
+        this.loadingPrograms = false;
+      }
     },
     cerrarCrear() {
       if (this.saving) return;
@@ -888,10 +1245,15 @@ export default {
     resetForm() {
       this.step = 1;
       this.formError = "";
+      this.formNotice = "";
+      this.modoFormulario = "crear";
+      this.planOriginalModificacion = null;
       this.programas = [];
       this.modalidades = [];
       this.calificaciones = [];
       this.curriculos = [];
+      this.asignaturasDisponibles = [];
+      this.aniosAcademicosPrograma = [];
       this.form = {
         id_prog_form: null,
         id_modalidad: null,
@@ -960,6 +1322,9 @@ export default {
         this.cargarModalidades(),
         this.cargarCalificacion(),
         this.cargarCurriculos(),
+        this.modoFormulario === "modificar"
+          ? this.cargarCatalogosEstructura()
+          : Promise.resolve(),
       ]);
     },
     async cargarModalidades() {
@@ -1085,6 +1450,201 @@ export default {
         ),
       }));
     },
+    async cargarCatalogosEstructura() {
+      const [asignaturasRes, aniosRes] = await Promise.all([
+        api.get("/asignatura"),
+        api.get("/a_academico"),
+      ]);
+
+      this.asignaturasDisponibles = this.normalizeList(asignaturasRes.data).map(
+        (asignatura) => ({
+          ...asignatura,
+          horas_clase:
+            asignatura.horas_clase !== undefined
+              ? Number(asignatura.horas_clase || 0)
+              : Number(asignatura.fondo_tiempo || 0),
+          horas_practica_laboral: Number(
+            asignatura.horas_practica_laboral || 0
+          ),
+        })
+      );
+
+      this.aniosAcademicosPrograma = this.normalizeList(aniosRes.data)
+        .filter(
+          (anio) => Number(anio.id_prog_form) === Number(this.form.id_prog_form)
+        )
+        .map((anio) => ({
+          ...anio,
+          nombre_completo: `${anio.identificador} - ${
+            this.selectedProgram?.nombre || "Programa"
+          }`,
+        }));
+    },
+    prepararEstructuraEditable(curriculos) {
+      return curriculos.map((curriculo) => ({
+        ...curriculo,
+        disciplinas: this.normalizeList(curriculo.disciplinas).map(
+          (disciplina) => ({
+            ...disciplina,
+            asignaturas: this.normalizeList(disciplina.asignaturas).map(
+              (asignatura) => ({
+                ...asignatura,
+                horas_clase:
+                  asignatura.horas_clase !== undefined
+                    ? Number(asignatura.horas_clase || 0)
+                    : Number(asignatura.fondo_tiempo || 0),
+                horas_practica_laboral: Number(
+                  asignatura.horas_practica_laboral || 0
+                ),
+              })
+            ),
+          })
+        ),
+      }));
+    },
+    curriculosDesdeSnapshot(estructura) {
+      return this.normalizeList(estructura).map((curriculo) => ({
+        ...curriculo,
+        disciplinas: this.normalizeList(curriculo.disciplinas).map(
+          (disciplina) => ({
+            ...disciplina,
+            fondo_tiempo: this.disciplinaTotalHoras(disciplina),
+            horas_clase: this.disciplinaHorasClase(disciplina),
+            horas_practica_laboral:
+              this.disciplinaHorasPracticaLaboral(disciplina),
+            asignaturas: this.normalizeList(disciplina.asignaturas).map(
+              (asignatura) => ({
+                ...asignatura,
+                fondo_tiempo: this.asignaturaTotalHoras(asignatura),
+              })
+            ),
+          })
+        ),
+      }));
+    },
+    asignaturaTotalHoras(asignatura) {
+      return (
+        Number(asignatura?.horas_clase || 0) +
+        Number(asignatura?.horas_practica_laboral || 0)
+      );
+    },
+    disciplinaHorasClase(disciplina) {
+      return this.normalizeList(disciplina?.asignaturas).reduce(
+        (total, asignatura) => total + Number(asignatura.horas_clase || 0),
+        0
+      );
+    },
+    disciplinaHorasPracticaLaboral(disciplina) {
+      return this.normalizeList(disciplina?.asignaturas).reduce(
+        (total, asignatura) =>
+          total + Number(asignatura.horas_practica_laboral || 0),
+        0
+      );
+    },
+    disciplinaTotalHoras(disciplina) {
+      return this.normalizeList(disciplina?.asignaturas).reduce(
+        (total, asignatura) => total + this.asignaturaTotalHoras(asignatura),
+        0
+      );
+    },
+    agregarDisciplina(curriculo) {
+      curriculo.disciplinas.push({
+        id: `new-disc-${Date.now()}`,
+        is_new: true,
+        nombre: "",
+        asignaturas: [],
+      });
+    },
+    agregarAsignatura(disciplina) {
+      disciplina.asignaturas.push({
+        id: `new-asig-${Date.now()}`,
+        is_new: true,
+        id_asignatura_existente: null,
+        nombre: "",
+        horas_clase: 0,
+        horas_practica_laboral: 0,
+        id_a_academico: [],
+        anios: [],
+      });
+    },
+    onAsignaturaExistenteChange(asignatura) {
+      const seleccionada = this.asignaturasDisponibles.find(
+        (item) => Number(item.id) === Number(asignatura.id_asignatura_existente)
+      );
+
+      if (!seleccionada) {
+        asignatura.nombre = "";
+        asignatura.horas_clase = 0;
+        asignatura.horas_practica_laboral = 0;
+        return;
+      }
+
+      asignatura.nombre = seleccionada.nombre;
+      asignatura.horas_clase = Number(seleccionada.horas_clase || 0);
+      asignatura.horas_practica_laboral = Number(
+        seleccionada.horas_practica_laboral || 0
+      );
+    },
+    validarEstructuraEditada() {
+      if (this.modoFormulario !== "modificar") return true;
+
+      for (const curriculo of this.curriculosSeleccionados) {
+        for (const disciplina of curriculo.disciplinas) {
+          if (disciplina.is_new && !String(disciplina.nombre || "").trim()) {
+            this.formError = "Escriba el nombre de la nueva disciplina.";
+            return false;
+          }
+
+          for (const asignatura of disciplina.asignaturas) {
+            if (!asignatura.is_new) continue;
+
+            const tieneExistente = !!asignatura.id_asignatura_existente;
+            const tieneNueva = !!String(asignatura.nombre || "").trim();
+
+            if (!tieneExistente && !tieneNueva) {
+              this.formError =
+                "Seleccione una asignatura existente o escriba una nueva.";
+              return false;
+            }
+
+            if (!this.normalizeList(asignatura.id_a_academico).length) {
+              this.formError =
+                "Seleccione al menos un año académico para la asignatura agregada.";
+              return false;
+            }
+          }
+        }
+      }
+
+      return true;
+    },
+    estructuraEditadaPayload() {
+      return this.curriculosSeleccionados.map((curriculo) => ({
+        id: curriculo.id,
+        nombre: curriculo.nombre,
+        disciplinas: this.normalizeList(curriculo.disciplinas).map(
+          (disciplina) => ({
+            id: disciplina.id,
+            nombre: disciplina.nombre,
+            asignaturas: this.normalizeList(disciplina.asignaturas).map(
+              (asignatura) => ({
+                id: asignatura.id,
+                is_new: !!asignatura.is_new,
+                id_asignatura_existente: asignatura.id_asignatura_existente,
+                nombre: asignatura.nombre,
+                fondo_tiempo: this.asignaturaTotalHoras(asignatura),
+                horas_clase: Number(asignatura.horas_clase || 0),
+                horas_practica_laboral: Number(
+                  asignatura.horas_practica_laboral || 0
+                ),
+                id_a_academico: this.normalizeList(asignatura.id_a_academico),
+                anios: this.normalizeList(asignatura.anios),
+              })
+            ),
+          })
+        ),
+      }));
+    },
     toggleCurriculo(id) {
       const normalizedId = Number(id);
       if (this.form.id_curriculo.includes(normalizedId)) {
@@ -1107,6 +1667,7 @@ export default {
     },
     siguiente() {
       this.formError = "";
+      this.formNotice = "";
       if (this.step === 1) {
         if (!this.form.id_prog_form) {
           this.formError = "Seleccione un programa de formación.";
@@ -1134,28 +1695,57 @@ export default {
     },
     async guardarPlan() {
       this.formError = "";
+      this.formNotice = "";
       if (!this.form.id_curso) {
         this.formError = "Seleccione un curso.";
+        return;
+      }
+      if (!this.validarEstructuraEditada()) {
         return;
       }
 
       this.saving = true;
       try {
         const programaNombre = this.selectedProgram?.nombre || "programa";
-        await api.post("/plan_estudio", {
+        const esModificacion = this.modoFormulario === "modificar";
+        const payload = {
           id_prog_form: Number(this.form.id_prog_form),
           id_modalidad: Number(this.form.id_modalidad),
           id_calificacion: Number(this.form.id_calificacion),
           id_curso: Number(this.form.id_curso),
           id_curriculo: this.form.id_curriculo.map(Number),
-        });
+        };
+
+        if (esModificacion) {
+          payload.estructura_editada = this.estructuraEditadaPayload();
+
+          const res = await api.post(
+            `/plan_estudio/${this.planOriginalModificacion.id}/modificar`,
+            payload
+          );
+
+          if (res.data?.no_changes) {
+            this.formNotice =
+              res.data?.message || "No se crearon modificaciones.";
+            toast.info("No se crearon modificaciones");
+            return;
+          }
+        } else {
+          await api.post("/plan_estudio", payload);
+        }
+
         this.dialogCrear = false;
+        const accion = esModificacion ? "modificó" : "creó";
         this.resetForm();
         await this.cargarPlanes();
-        toast.success("Plan de estudio creado correctamente");
+        toast.success(
+          esModificacion
+            ? "Modificación de plan creada correctamente"
+            : "Plan de estudio creado correctamente"
+        );
         this.$store.dispatch("registerActivity", {
           type: "plan_estudio",
-          label: `Creó un plan de estudio para ${programaNombre}`,
+          label: `Se ${accion} un plan de estudio para ${programaNombre}`,
         });
       } catch (error) {
         console.error(error);
@@ -1185,6 +1775,12 @@ export default {
 .modern-table {
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+.acciones-plan {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .modern-table :deep(th) {
@@ -1312,6 +1908,54 @@ export default {
   margin-top: 6px;
   color: #0f172a;
   font-size: 22px;
+}
+
+.changes-panel {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid #dbe4ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.changes-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.change-line {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.change-line span {
+  font-weight: 800;
+}
+
+.change-line small {
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.change-line.added {
+  border-left: 4px solid #22c55e;
+}
+
+.change-line.removed {
+  border-left: 4px solid #ef4444;
+}
+
+.change-line.modified {
+  border-left: 4px solid #3b82f6;
 }
 
 .detail-curriculo {
@@ -1592,11 +2236,39 @@ export default {
   background: #fbfdff;
 }
 
+.asignatura-row-editing {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
 .asignatura-row > div:first-child {
   display: flex;
   min-width: 0;
   flex: 1;
   gap: 10px;
+}
+
+.asignatura-edit-grid {
+  display: grid !important;
+  width: 100%;
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(180px, 1fr)
+    100px
+    100px
+    140px
+    minmax(170px, 0.8fr);
+  gap: 10px;
+}
+
+.asignatura-name-readonly {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #d6dee8;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .asignatura-row strong {
@@ -1706,6 +2378,11 @@ export default {
     text-align: left;
   }
 
+  .change-line {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
   .detail-table-head {
     display: none;
   }
@@ -1731,6 +2408,10 @@ export default {
   .asignatura-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .asignatura-edit-grid {
+    grid-template-columns: 1fr;
   }
 
   .anio-chip-list {
