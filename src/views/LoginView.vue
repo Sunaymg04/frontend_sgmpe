@@ -357,7 +357,6 @@ export default {
         await this.$store.dispatch("login", {
           username: this.username.trim(),
           password: this.password,
-          usersApi,
           api,
         });
         const role = this.$store.getters.primaryRole;
@@ -401,16 +400,17 @@ export default {
       this.adminLoading = true;
       try {
         const username = this.admin.username.trim();
-        const validateRes = await usersApi.post("/users/validate", {
+        const validateRes = await api.post("/login", {
           username,
           password: this.admin.password,
+          application: APPLICATION_CODE,
         });
 
         if (!validateRes?.data?.valid) {
           throw new Error("Credenciales de administrador inválidas.");
         }
 
-        const accessRes = await this.getApplicationAccess(username);
+        const accessRes = validateRes;
         const access = Array.isArray(accessRes?.data?.access)
           ? accessRes.data.access
           : [];
@@ -575,18 +575,10 @@ export default {
       const endpoint = `/users/${encodeURIComponent(username)}/access`;
       const config = { params: { application: APPLICATION_CODE } };
 
-      try {
-        return await api.get(endpoint, config);
-      } catch (error) {
-        return usersApi.get(endpoint, config);
-      }
+      return api.get(endpoint, config);
     },
     async assignApplicationAccess(payload) {
-      try {
-        return await api.post("/access/assign", payload);
-      } catch (error) {
-        return usersApi.post("/access/assign", payload);
-      }
+      return api.post("/access/assign", payload);
     },
     resetAssignment() {
       this.assignment = {

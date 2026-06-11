@@ -73,6 +73,8 @@ export default {
         { title: "Total", key: "fondo_tiempo" },
         { title: "Clase", key: "horas_clase" },
         { title: "Práctica laboral", key: "horas_practica_laboral" },
+        { title: "Examen final", key: "examenFinal" },
+        { title: "Trabajo curso", key: "trabajoCurso" },
         { title: "Disciplina", key: "disciplinas" },
         { title: "Año / Programa de Formación", key: "anoPrograma" },
         { title: "Acciones", key: "acciones", sortable: false },
@@ -155,6 +157,8 @@ export default {
             ano: nombresAnos,
             programa: nombresProgramas,
             anoPrograma,
+            examenFinal: a.tiene_examen_final ? "Sí" : "No",
+            trabajoCurso: a.tiene_trabajo_curso ? "Sí" : "No",
           };
         });
 

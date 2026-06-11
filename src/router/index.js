@@ -7,6 +7,7 @@ import DisciplinaListView from "../views/disciplina/DisciplinaListView";
 import LoginView from "../views/LoginView.vue";
 import PlanEstudioListView from "../views/planEstudio/PlanEstudioListView.vue";
 import SolicitudesModificacionView from "../views/decano/SolicitudesModificacionView.vue";
+import PlanEstudioExcelView from "../views/planEstudio/PlanEstudioExcelView.vue";
 
 import EstructuraCurricularViews from "../views/EstructuraCurricularViews.vue";
 import store from "../store";
@@ -36,6 +37,11 @@ const routes = [
     path: "/plan_estudio",
     name: "plan_estudio",
     component: PlanEstudioListView,
+  },
+  {
+    path: "/plan_estudio/:id/excel",
+    name: "plan_estudio_excel",
+    component: PlanEstudioExcelView,
   },
   {
     path: "/decano/solicitudes",

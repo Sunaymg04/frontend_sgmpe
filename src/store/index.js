@@ -15,21 +15,6 @@ function clearPersistedAuth() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-async function getApplicationAccess({ username, api, usersApi }) {
-  const endpoint = `/users/${encodeURIComponent(username)}/access`;
-  const config = { params: { application: APPLICATION_CODE } };
-
-  if (api) {
-    try {
-      return await api.get(endpoint, config);
-    } catch (error) {
-      if (!usersApi) throw error;
-    }
-  }
-
-  return usersApi.get(endpoint, config);
-}
-
 clearPersistedAuth();
 
 export default createStore({
@@ -89,13 +74,13 @@ export default createStore({
     registerActivity({ commit }, payload) {
       commit("addActivity", payload);
     },
-    async login({ commit }, { username, password, usersApi, api }) {
-      let validateRes;
-
+    async login({ commit }, { username, password, api }) {
+      let loginRes;
       try {
-        validateRes = await usersApi.post("/users/validate", {
+        loginRes = await api.post("/login", {
           username,
           password,
+          application: APPLICATION_CODE,
         });
       } catch (error) {
         if (error?.response?.status === 401) {
@@ -105,11 +90,11 @@ export default createStore({
         throw error;
       }
 
-      if (!validateRes?.data?.valid) {
+      if (!loginRes?.data?.valid) {
         throw new Error("Usuario o contraseña incorrectos.");
       }
 
-      const accessRes = await getApplicationAccess({ username, api, usersApi });
+      const accessRes = loginRes;
 
       if (!accessRes?.data?.can_access) {
         throw new Error(

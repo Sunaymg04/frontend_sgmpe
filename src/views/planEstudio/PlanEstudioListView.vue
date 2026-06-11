@@ -91,6 +91,15 @@
               <v-icon>mdi-file-document-edit-outline</v-icon>
             </v-btn>
             <v-btn
+              icon
+              variant="text"
+              color="success"
+              :disabled="saving || deleting"
+              @click="abrirExcel(item)"
+            >
+              <v-icon>mdi-microsoft-excel</v-icon>
+            </v-btn>
+            <v-btn
               v-if="puedeEnviarModificacion(item)"
               icon
               variant="text"
@@ -1367,6 +1376,12 @@ export default {
       } finally {
         this.detalleLoading = false;
       }
+    },
+    abrirExcel(plan) {
+      this.$router.push({
+        name: "plan_estudio_excel",
+        params: { id: plan.id },
+      });
     },
     cerrarDetalle() {
       this.dialogDetalle = false;

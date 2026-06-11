@@ -66,6 +66,27 @@
             </v-col>
           </v-row>
 
+          <v-row>
+            <v-col cols="12" md="6">
+              <v-switch
+                v-model="form.tiene_examen_final"
+                color="primary"
+                label="Tiene examen final"
+                hide-details
+                inset
+              />
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-switch
+                v-model="form.tiene_trabajo_curso"
+                color="primary"
+                label="Tiene trabajo de curso"
+                hide-details
+                inset
+              />
+            </v-col>
+          </v-row>
+
           <!-- Disciplinas -->
           <v-select
             v-model="form.id_disciplina"
@@ -137,6 +158,8 @@ export default {
         fondo_tiempo: "",
         horas_clase: 0,
         horas_practica_laboral: 0,
+        tiene_examen_final: false,
+        tiene_trabajo_curso: false,
         id_disciplina: [],
         id_a_academico: [],
       },
@@ -186,6 +209,8 @@ export default {
                 ? Number(valor.horas_clase || 0)
                 : Number(valor.fondo_tiempo || 0),
             horas_practica_laboral: Number(valor.horas_practica_laboral || 0),
+            tiene_examen_final: Boolean(valor.tiene_examen_final),
+            tiene_trabajo_curso: Boolean(valor.tiene_trabajo_curso),
 
             // disciplinas
 
@@ -310,6 +335,8 @@ export default {
         fondo_tiempo: "",
         horas_clase: 0,
         horas_practica_laboral: 0,
+        tiene_examen_final: false,
+        tiene_trabajo_curso: false,
         id_disciplina: [],
         id_a_academico: [],
       };
@@ -321,6 +348,8 @@ export default {
         fondo_tiempo: this.fondoTiempoTotal,
         horas_clase: Number(this.form.horas_clase || 0),
         horas_practica_laboral: Number(this.form.horas_practica_laboral || 0),
+        tiene_examen_final: Boolean(this.form.tiene_examen_final),
+        tiene_trabajo_curso: Boolean(this.form.tiene_trabajo_curso),
       };
     },
   },
