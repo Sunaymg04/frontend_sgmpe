@@ -6,6 +6,7 @@ import CurriculoListView from "../views/curriculo/CurriculoListView.vue";
 import DisciplinaListView from "../views/disciplina/DisciplinaListView";
 import LoginView from "../views/LoginView.vue";
 import PlanEstudioListView from "../views/planEstudio/PlanEstudioListView.vue";
+import SolicitudesModificacionView from "../views/decano/SolicitudesModificacionView.vue";
 
 import EstructuraCurricularViews from "../views/EstructuraCurricularViews.vue";
 import store from "../store";
@@ -35,6 +36,17 @@ const routes = [
     path: "/plan_estudio",
     name: "plan_estudio",
     component: PlanEstudioListView,
+  },
+  {
+    path: "/decano/solicitudes",
+    name: "decano_solicitudes",
+    component: SolicitudesModificacionView,
+  },
+  {
+    path: "/decano/historial",
+    name: "decano_historial",
+    component: SolicitudesModificacionView,
+    meta: { historial: true },
   },
 
   {
@@ -71,6 +83,13 @@ router.beforeEach((to) => {
     return { name: "login" };
   }
   if (isAuthed && to.name === "login") return { name: "dashboard" };
+  if (
+    isAuthed &&
+    store.getters.primaryRole === "decano" &&
+    to.name === "dashboard"
+  ) {
+    return { name: "decano_solicitudes" };
+  }
   return true;
 });
 

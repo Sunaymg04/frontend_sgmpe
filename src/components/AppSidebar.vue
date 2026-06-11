@@ -56,7 +56,7 @@ export default {
 
   data() {
     return {
-      items: [
+      defaultItems: [
         { title: "Dashboard", icon: "mdi-view-dashboard", to: "/" },
         {
           title: "Estructura Curricular",
@@ -69,10 +69,27 @@ export default {
           to: "/plan_estudio",
         },
       ],
+      deanItems: [
+        {
+          title: "Revisión Académica",
+          icon: "mdi-clipboard-check-outline",
+          to: "/decano/solicitudes",
+        },
+        {
+          title: "Historial",
+          icon: "mdi-history",
+          to: "/decano/historial",
+        },
+      ],
     };
   },
 
   computed: {
+    items() {
+      return this.$store.getters.primaryRole === "decano"
+        ? this.deanItems
+        : this.defaultItems;
+    },
     drawer: {
       get() {
         return this.modelValue;

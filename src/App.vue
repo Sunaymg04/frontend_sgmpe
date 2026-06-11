@@ -4,10 +4,16 @@
       <AppNavbar
         :name="name"
         :role="role"
-        :department="departmentName"
+        :department="contextName"
         :sidebar-collapsed="sidebarCollapsed"
+        :notifications="notifications"
+        :unread-notifications="unreadNotifications"
+        :notifications-loading="notificationsLoading"
+        :shake-notifications="notificationShake"
         @toggle-sidebar="toggleSidebar"
         @open-profile="profileOpen = true"
+        @refresh-notifications="loadNotifications"
+        @mark-notifications-read="markNotificationsRead"
       />
       <AppSidebar v-model="drawer" :collapsed="sidebarCollapsed" />
     </template>
@@ -38,8 +44,8 @@
           <div class="text-body-2 text-medium-emphasis">
             {{ role || "Sin rol" }}
           </div>
-          <div v-if="departmentName" class="text-body-2 text-medium-emphasis">
-            {{ departmentName }}
+          <div v-if="contextName" class="text-body-2 text-medium-emphasis">
+            {{ contextName }}
           </div>
         </v-card>
 
@@ -123,7 +129,11 @@ export default {
       sidebarCollapsed: false,
       profileOpen: false,
       showMe: false,
-      departmentName: "",
+      contextName: "",
+      notifications: [],
+      notificationsLoading: false,
+      notificationShake: false,
+      notificationsTimer: null,
     };
   },
   computed: {
@@ -144,8 +154,17 @@ export default {
     departmentId() {
       return this.currentAccess?.departamento_id ?? null;
     },
+    facultyId() {
+      return this.currentAccess?.facultad_id ?? null;
+    },
     recentActivity() {
       return this.$store.getters.recentActivity || [];
+    },
+    authUsername() {
+      return this.$store.getters.authUsername || "";
+    },
+    unreadNotifications() {
+      return this.notifications.filter((item) => !item.read_at).length;
     },
   },
   methods: {
@@ -155,6 +174,8 @@ export default {
     logout() {
       this.profileOpen = false;
       this.showMe = false;
+      this.stopNotificationsPolling();
+      this.notifications = [];
       this.$store.dispatch("logout");
       this.$router.replace({ name: "login" });
     },
@@ -191,15 +212,91 @@ export default {
     },
     async loadDepartmentName(departmentId) {
       if (!departmentId) {
-        this.departmentName = "";
+        this.contextName = "";
         return;
       }
 
       try {
         const response = await api.get(`/departamento/${departmentId}`);
-        this.departmentName = response?.data?.data?.nombre || "";
+        this.contextName = response?.data?.data?.nombre || "";
       } catch {
-        this.departmentName = "";
+        this.contextName = "";
+      }
+    },
+    async loadFacultyName(facultyId) {
+      if (!facultyId) {
+        this.contextName = "";
+        return;
+      }
+
+      try {
+        const response = await api.get(`/facultad/${facultyId}`);
+        this.contextName = response?.data?.data?.nombre || "";
+      } catch {
+        this.contextName = "";
+      }
+    },
+    async loadNotifications() {
+      if (!this.showShell || !this.authUsername) {
+        this.notifications = [];
+        return;
+      }
+
+      this.notificationsLoading = true;
+      try {
+        const response = await api.get("/notifications", {
+          params: { username: this.authUsername },
+        });
+        this.notifications = Array.isArray(response?.data?.data)
+          ? response.data.data
+          : [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.notificationsLoading = false;
+      }
+    },
+    async markNotificationsRead() {
+      const unreadIds = this.notifications
+        .filter((item) => !item.read_at)
+        .map((item) => item.id);
+
+      if (!unreadIds.length || !this.authUsername) return;
+
+      const readAt = new Date().toISOString();
+      this.notifications = this.notifications.map((item) =>
+        unreadIds.includes(item.id) ? { ...item, read_at: readAt } : item
+      );
+
+      try {
+        await api.post("/notifications/read", {
+          username: this.authUsername,
+          ids: unreadIds,
+        });
+      } catch (error) {
+        console.error(error);
+        await this.loadNotifications();
+      }
+    },
+    triggerNotificationShake() {
+      this.notificationShake = false;
+      window.setTimeout(() => {
+        this.notificationShake = true;
+        window.setTimeout(() => {
+          this.notificationShake = false;
+        }, 900);
+      }, 80);
+    },
+    startNotificationsPolling() {
+      this.stopNotificationsPolling();
+      this.notificationsTimer = window.setInterval(() => {
+        this.loadNotifications();
+      }, 60000);
+    },
+    stopNotificationsPolling() {
+      if (this.notificationsTimer) {
+        window.clearInterval(this.notificationsTimer);
+        this.notificationsTimer = null;
       }
     },
   },
@@ -210,9 +307,44 @@ export default {
     departmentId: {
       immediate: true,
       handler(value) {
+        if (this.currentAccess?.role === "decano") return;
         this.loadDepartmentName(value);
       },
     },
+    facultyId: {
+      immediate: true,
+      handler(value) {
+        if (this.currentAccess?.role !== "decano") return;
+        this.loadFacultyName(value);
+      },
+    },
+    authUsername: {
+      immediate: true,
+      async handler(value) {
+        if (!value || !this.showShell) return;
+        await this.loadNotifications();
+        this.triggerNotificationShake();
+        this.startNotificationsPolling();
+      },
+    },
+    showShell: {
+      immediate: true,
+      async handler(value) {
+        if (!value) {
+          this.stopNotificationsPolling();
+          return;
+        }
+
+        if (this.authUsername) {
+          await this.loadNotifications();
+          this.triggerNotificationShake();
+          this.startNotificationsPolling();
+        }
+      },
+    },
+  },
+  beforeUnmount() {
+    this.stopNotificationsPolling();
   },
 };
 </script>

@@ -150,14 +150,14 @@
           </v-btn>
         </v-form>
 
-        <v-form v-else @submit.prevent="assignDepartmentChief">
+        <v-form v-else @submit.prevent="assignApplicationRole">
           <v-alert
             type="success"
             variant="tonal"
             density="comfortable"
             class="mb-5"
           >
-            Administrador validado. Solo se asigna el rol jefe_departamento.
+            Administrador validado. Seleccione el rol y el contexto de acceso.
           </v-alert>
 
           <v-text-field
@@ -174,6 +174,18 @@
           />
 
           <v-select
+            v-model="assignment.role"
+            :items="roleOptions"
+            label="Rol"
+            prepend-inner-icon="mdi-shield-account-outline"
+            variant="outlined"
+            density="comfortable"
+            :disabled="assignLoading"
+            :error-messages="assignmentErrors.role"
+          />
+
+          <v-select
+            v-if="assignment.role === 'jefe_departamento'"
             v-model="assignment.departmentKey"
             :items="departmentOptions"
             label="Departamento"
@@ -185,14 +197,19 @@
             :error-messages="assignmentErrors.departmentId"
           />
 
-          <v-text-field
-            value="jefe_departamento"
-            label="Rol"
-            prepend-inner-icon="mdi-shield-account-outline"
+          <v-select
+            v-else-if="assignment.role === 'decano'"
+            v-model="assignment.facultyId"
+            :items="facultyOptions"
+            item-title="nombre"
+            item-value="id"
+            label="Facultad"
+            prepend-inner-icon="mdi-bank-outline"
             variant="outlined"
             density="comfortable"
-            readonly
-            disabled
+            :loading="departmentsLoading"
+            :disabled="assignLoading || departmentsLoading"
+            :error-messages="assignmentErrors.facultyId"
           />
 
           <v-btn
@@ -203,7 +220,7 @@
             :loading="assignLoading"
             :disabled="departmentsLoading"
           >
-            Asignar jefe de departamento
+            Asignar rol
           </v-btn>
         </v-form>
 
@@ -227,6 +244,7 @@ import usersApi from "@/services/usersApi";
 
 const APPLICATION_CODE = "gestion_plan_estudio";
 const DEPARTMENT_CHIEF_ROLE = "jefe_departamento";
+const DEAN_ROLE = "decano";
 
 export default {
   name: "LoginView",
@@ -260,12 +278,16 @@ export default {
       departmentsLoading: false,
       assignment: {
         username: "",
+        role: DEPARTMENT_CHIEF_ROLE,
         departmentId: null,
         departmentKey: "",
+        facultyId: null,
       },
       assignmentErrors: {
         username: "",
+        role: "",
         departmentId: "",
+        facultyId: "",
       },
       assignLoading: false,
     };
@@ -273,6 +295,15 @@ export default {
   computed: {
     departmentOptions() {
       return this.departments.map((department) => department.__key);
+    },
+    facultyOptions() {
+      return this.faculties;
+    },
+    roleOptions() {
+      return [
+        { title: "Jefe de departamento", value: DEPARTMENT_CHIEF_ROLE },
+        { title: "Decano", value: DEAN_ROLE },
+      ];
     },
   },
   methods: {
@@ -329,7 +360,10 @@ export default {
           usersApi,
           api,
         });
-        this.$router.replace({ name: "dashboard" });
+        const role = this.$store.getters.primaryRole;
+        this.$router.replace({
+          name: role === DEAN_ROLE ? "decano_solicitudes" : "dashboard",
+        });
       } catch (e) {
         this.error = this.getFriendlyLoginError(e);
       } finally {
@@ -347,8 +381,7 @@ export default {
       this.adminMessage = "";
       this.admin = { username: "", password: "" };
       this.adminErrors = { username: "", password: "" };
-      this.assignment = { username: "", departmentId: null, departmentKey: "" };
-      this.assignmentErrors = { username: "", departmentId: "" };
+      this.resetAssignment();
     },
     validateAdminFields() {
       const errors = { username: "", password: "" };
@@ -504,15 +537,34 @@ export default {
       throw lastError;
     },
     validateAssignmentFields() {
-      const errors = { username: "", departmentId: "" };
+      const errors = {
+        username: "",
+        role: "",
+        departmentId: "",
+        facultyId: "",
+      };
       if (!this.assignment.username?.trim()) {
         errors.username = "El usuario es requerido.";
       }
-      if (!this.assignment.departmentKey) {
+      if (![DEPARTMENT_CHIEF_ROLE, DEAN_ROLE].includes(this.assignment.role)) {
+        errors.role = "Seleccione un rol.";
+      }
+      if (
+        this.assignment.role === DEPARTMENT_CHIEF_ROLE &&
+        !this.assignment.departmentKey
+      ) {
         errors.departmentId = "Seleccione un departamento.";
       }
+      if (this.assignment.role === DEAN_ROLE && !this.assignment.facultyId) {
+        errors.facultyId = "Seleccione una facultad.";
+      }
       this.assignmentErrors = errors;
-      return !errors.username && !errors.departmentId;
+      return (
+        !errors.username &&
+        !errors.role &&
+        !errors.departmentId &&
+        !errors.facultyId
+      );
     },
     async userExists(username) {
       const res = await usersApi.get("/users");
@@ -536,23 +588,43 @@ export default {
         return usersApi.post("/access/assign", payload);
       }
     },
-    async assignDepartmentChief() {
+    resetAssignment() {
+      this.assignment = {
+        username: "",
+        role: DEPARTMENT_CHIEF_ROLE,
+        departmentId: null,
+        departmentKey: "",
+        facultyId: null,
+      };
+      this.assignmentErrors = {
+        username: "",
+        role: "",
+        departmentId: "",
+        facultyId: "",
+      };
+    },
+    async assignApplicationRole() {
       this.adminMessage = "";
       if (!this.validateAssignmentFields()) return;
 
       const username = this.assignment.username.trim();
-      const department = this.departments.find(
-        (item) => item.__key === this.assignment.departmentKey
-      );
-      let facultyId = this.getDepartmentFacultyId(department);
+      const isDepartmentChief = this.assignment.role === DEPARTMENT_CHIEF_ROLE;
+      const department = isDepartmentChief
+        ? this.departments.find(
+            (item) => item.__key === this.assignment.departmentKey
+          )
+        : null;
+      let facultyId = isDepartmentChief
+        ? this.getDepartmentFacultyId(department)
+        : this.assignment.facultyId;
 
-      if (!facultyId && department?.id) {
+      if (isDepartmentChief && !facultyId && department?.id) {
         facultyId = await this.resolveDepartmentFacultyId(department.id).catch(
           () => null
         );
       }
 
-      if (!department || !facultyId) {
+      if (isDepartmentChief && (!department || !facultyId)) {
         this.assignmentErrors.departmentId =
           "El departamento seleccionado no tiene facultad asociada.";
         return;
@@ -568,16 +640,12 @@ export default {
         await this.assignApplicationAccess({
           application_code: APPLICATION_CODE,
           username,
-          role: DEPARTMENT_CHIEF_ROLE,
+          role: this.assignment.role,
           facultad_id: Number(facultyId),
-          departamento_id: Number(department.id),
+          departamento_id: isDepartmentChief ? Number(department.id) : null,
         });
 
-        this.assignment = {
-          username: "",
-          departmentId: null,
-          departmentKey: "",
-        };
+        this.resetAssignment();
         this.adminMessageType = "success";
         this.adminMessage =
           "Jefe de Departamento asignado. Si ya existía uno para ese departamento se dejará activo solo el nuevo acceso";
@@ -588,13 +656,21 @@ export default {
           e?.message ||
           "No fue posible asignar el rol.";
       } finally {
+        if (this.adminMessageType === "success") {
+          this.adminMessage = isDepartmentChief
+            ? "Jefe de Departamento asignado. Si ya existia uno para ese departamento se dejara activo solo el nuevo acceso."
+            : "Decano asignado. Si ya existia uno para esa facultad se dejara activo solo el nuevo acceso.";
+        }
         this.assignLoading = false;
       }
     },
   },
   mounted() {
     if (this.$store.getters.isAuthenticated) {
-      this.$router.replace({ name: "dashboard" });
+      const role = this.$store.getters.primaryRole;
+      this.$router.replace({
+        name: role === DEAN_ROLE ? "decano_solicitudes" : "dashboard",
+      });
     }
   },
 };
