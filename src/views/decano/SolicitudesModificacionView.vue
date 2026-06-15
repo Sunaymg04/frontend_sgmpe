@@ -2,9 +2,9 @@
   <div class="dean-review">
     <div class="page-header">
       <div>
-        <h2 class="mb-1">Revisión Académica</h2>
+        <h2 class="mb-1">{{ pageTitle }}</h2>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          Solicitudes enviadas por los departamentos de la facultad.
+          {{ pageSubtitle }}
         </p>
       </div>
       <v-btn icon variant="text" :loading="loading" @click="cargarSolicitudes">
@@ -14,7 +14,7 @@
 
     <div class="review-tabs">
       <v-btn
-        :to="{ name: 'decano_solicitudes' }"
+        :to="{ name: solicitudesRouteName }"
         :variant="isHistorial ? 'text' : 'flat'"
         color="primary"
       >
@@ -22,7 +22,7 @@
         Pendientes
       </v-btn>
       <v-btn
-        :to="{ name: 'decano_historial' }"
+        :to="{ name: historialRouteName }"
         :variant="isHistorial ? 'flat' : 'text'"
         color="primary"
       >
@@ -32,7 +32,7 @@
     </div>
 
     <v-alert
-      v-if="!facultyId"
+      v-if="requiresFaculty && !facultyId"
       type="warning"
       variant="tonal"
       density="comfortable"
@@ -257,7 +257,7 @@
                 @click="cancelarSolicitud(plan)"
               >
                 {{
-                  planEsNuevo(plan) ? "Rechazar plan" : "Cancelar modificación"
+                  planEsNuevo(plan) ? "Rechazar plan" : "Rechazar modificación"
                 }}
               </v-btn>
               <v-btn
@@ -267,7 +267,7 @@
                 @click="aprobarSolicitud(plan)"
               >
                 {{
-                  planEsNuevo(plan) ? "Aprobar plan" : "Aceptar modificación"
+                  planEsNuevo(plan) ? "Aprobar plan" : "Aprobar modificación"
                 }}
               </v-btn>
             </div>
@@ -299,12 +299,51 @@ export default {
     isHistorial() {
       return Boolean(this.$route?.meta?.historial);
     },
+    reviewerRole() {
+      return this.$route?.meta?.reviewerRole || "decano";
+    },
+    isViceDeanReview() {
+      return this.reviewerRole === "vicedecano_docente";
+    },
+    requiresFaculty() {
+      return !this.isViceDeanReview;
+    },
+    pageTitle() {
+      return this.isViceDeanReview
+        ? "Revisión Final Académica"
+        : "Revisión Académica";
+    },
+    pageSubtitle() {
+      return this.isViceDeanReview
+        ? "Solicitudes aprobadas por el decano y enviadas para revisión final."
+        : "Solicitudes enviadas por los departamentos de la facultad.";
+    },
+    solicitudesRouteName() {
+      return this.isViceDeanReview
+        ? "vicedecano_solicitudes"
+        : "decano_solicitudes";
+    },
+    historialRouteName() {
+      return this.isViceDeanReview
+        ? "vicedecano_historial"
+        : "decano_historial";
+    },
     facultyId() {
       const access = this.$store.getters.authAccess || [];
-      const decano = access.find(
-        (item) => item?.active && item?.role === "decano"
+      const reviewer = access.find(
+        (item) => item?.active && item?.role === this.reviewerRole
       );
-      return decano?.facultad_id ?? null;
+      return reviewer?.facultad_id ?? null;
+    },
+    solicitudesEndpoint() {
+      return this.isViceDeanReview
+        ? "/plan_estudio/vicedecano/solicitudes"
+        : "/plan_estudio/decano/solicitudes";
+    },
+    historialEndpoint() {
+      return this.isViceDeanReview
+        ? "/plan_estudio/vicedecano/historial"
+        : "/plan_estudio/decano/historial";
     },
     detalleStats() {
       const stats = {
@@ -331,15 +370,18 @@ export default {
   },
   methods: {
     async cargarSolicitudes() {
-      if (!this.facultyId) return;
+      if (this.requiresFaculty && !this.facultyId) return;
 
       this.loading = true;
       try {
         const endpoint = this.isHistorial
-          ? "/plan_estudio/decano/historial"
-          : "/plan_estudio/decano/solicitudes";
+          ? this.historialEndpoint
+          : this.solicitudesEndpoint;
+        const params = this.requiresFaculty
+          ? { facultad_id: this.facultyId }
+          : {};
         const res = await api.get(endpoint, {
-          params: { facultad_id: this.facultyId },
+          params,
         });
         this.solicitudes = Array.isArray(res.data?.data) ? res.data.data : [];
       } catch (error) {
@@ -353,6 +395,12 @@ export default {
       return plan?.tipo_plan === "original";
     },
     solicitudLabelBase(plan) {
+      if (this.isViceDeanReview) {
+        return this.planEsNuevo(plan)
+          ? "Nuevo plan para revisión final"
+          : "Modificación para revisión final";
+      }
+
       return this.planEsNuevo(plan) ? "Nuevo plan" : "Modificación enviada";
     },
     solicitudLabel(plan) {
@@ -360,7 +408,7 @@ export default {
         return this.estadoSolicitudLabel(plan);
       }
 
-      return this.planEsNuevo(plan) ? "Nuevo plan" : "Modificación enviada";
+      return this.solicitudLabelBase(plan);
     },
     solicitudColor(plan) {
       const estado = String(plan?.estado || "");
@@ -368,7 +416,9 @@ export default {
       if (["rechazado", "modificacion_cancelada"].includes(estado)) {
         return "error";
       }
-      if (estado === "enviado_decano") return "info";
+      if (["enviado_decano", "enviado_vicedecano"].includes(estado)) {
+        return "info";
+      }
       if (this.planEsNuevo(plan)) return "primary";
       return "secondary";
     },
@@ -378,11 +428,16 @@ export default {
         enviado_decano: this.planEsNuevo(plan)
           ? "Nuevo plan pendiente"
           : "Modificación pendiente",
+        enviado_vicedecano: this.isViceDeanReview
+          ? "Pendiente de revisión final"
+          : "Enviado al vicedecano docente",
         vigente: this.planEsNuevo(plan)
           ? "Plan aprobado"
           : "Modificación aprobada",
         rechazado: "Plan rechazado",
-        modificacion_cancelada: "Modificación cancelada",
+        modificacion_cancelada: this.isViceDeanReview
+          ? "Modificación rechazada"
+          : "Modificación cancelada",
       };
 
       return labels[estado] || estado || "Solicitud";
@@ -579,13 +634,19 @@ export default {
     async aprobarSolicitud(plan) {
       this.accionLoading = `aprobar-${plan.id}`;
       try {
-        await api.post(`/plan_estudio/${plan.id}/aprobar`, {
+        const endpoint = this.isViceDeanReview
+          ? `/plan_estudio/${plan.id}/vicedecano/aprobar`
+          : `/plan_estudio/${plan.id}/aprobar`;
+        await api.post(endpoint, {
           username: this.$store.getters.authUsername,
         });
+        const message = this.planEsNuevo(plan)
+          ? "Plan aprobado correctamente"
+          : "Modificación aprobada correctamente";
         toast.success(
-          this.planEsNuevo(plan)
-            ? "Plan aprobado correctamente"
-            : "Modificación aprobada correctamente"
+          this.isViceDeanReview
+            ? `${message}. Queda vigente`
+            : `${message}. Enviado al vicedecano docente`
         );
         this.detalleAbiertoId = null;
         await this.cargarSolicitudes();
@@ -601,13 +662,16 @@ export default {
     async cancelarSolicitud(plan) {
       this.accionLoading = `cancelar-${plan.id}`;
       try {
-        await api.post(`/plan_estudio/${plan.id}/cancelar`, {
+        const endpoint = this.isViceDeanReview
+          ? `/plan_estudio/${plan.id}/vicedecano/cancelar`
+          : `/plan_estudio/${plan.id}/cancelar`;
+        await api.post(endpoint, {
           username: this.$store.getters.authUsername,
         });
         toast.success(
           this.planEsNuevo(plan)
             ? "Plan rechazado correctamente"
-            : "Modificación cancelada correctamente"
+            : "Modificación rechazada correctamente"
         );
         this.detalleAbiertoId = null;
         await this.cargarSolicitudes();

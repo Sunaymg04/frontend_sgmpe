@@ -307,14 +307,18 @@ export default {
     departmentId: {
       immediate: true,
       handler(value) {
-        if (this.currentAccess?.role === "decano") return;
+        if (this.currentAccess?.role === "decano") {
+          return;
+        }
         this.loadDepartmentName(value);
       },
     },
     facultyId: {
       immediate: true,
       handler(value) {
-        if (this.currentAccess?.role !== "decano") return;
+        if (this.currentAccess?.role !== "decano") {
+          return;
+        }
         this.loadFacultyName(value);
       },
     },

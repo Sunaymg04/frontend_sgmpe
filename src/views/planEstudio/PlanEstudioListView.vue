@@ -1233,6 +1233,7 @@ export default {
       const estado = plan?.estado || "esperando_aprobacion";
       const extraLabels = {
         enviado_decano: "Enviado al decano",
+        enviado_vicedecano: "Enviado al vicedecano docente",
         version_anterior: "Version anterior",
         modificacion_cancelada: "Modificacion cancelada",
       };
@@ -1249,6 +1250,7 @@ export default {
       const estado = plan?.estado || "esperando_aprobacion";
       const extraColors = {
         enviado_decano: "info",
+        enviado_vicedecano: "info",
         version_anterior: "grey",
         modificacion_cancelada: "error",
       };

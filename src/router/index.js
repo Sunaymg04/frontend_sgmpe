@@ -54,6 +54,18 @@ const routes = [
     component: SolicitudesModificacionView,
     meta: { historial: true },
   },
+  {
+    path: "/vicedecano/solicitudes",
+    name: "vicedecano_solicitudes",
+    component: SolicitudesModificacionView,
+    meta: { reviewerRole: "vicedecano_docente" },
+  },
+  {
+    path: "/vicedecano/historial",
+    name: "vicedecano_historial",
+    component: SolicitudesModificacionView,
+    meta: { historial: true, reviewerRole: "vicedecano_docente" },
+  },
 
   {
     path: "/disciplina",
@@ -95,6 +107,13 @@ router.beforeEach((to) => {
     to.name === "dashboard"
   ) {
     return { name: "decano_solicitudes" };
+  }
+  if (
+    isAuthed &&
+    store.getters.primaryRole === "vicedecano_docente" &&
+    to.name === "dashboard"
+  ) {
+    return { name: "vicedecano_solicitudes" };
   }
   return true;
 });

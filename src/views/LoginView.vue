@@ -88,7 +88,7 @@
           <div>
             <div class="text-h6 font-weight-bold">Configuración de acceso</div>
             <div class="text-body-2 text-medium-emphasis">
-              Administración de jefes de departamento
+              Administración de roles
             </div>
           </div>
           <v-btn
@@ -245,6 +245,7 @@ import usersApi from "@/services/usersApi";
 const APPLICATION_CODE = "gestion_plan_estudio";
 const DEPARTMENT_CHIEF_ROLE = "jefe_departamento";
 const DEAN_ROLE = "decano";
+const VICE_DEAN_ROLE = "vicedecano_docente";
 
 export default {
   name: "LoginView",
@@ -303,6 +304,7 @@ export default {
       return [
         { title: "Jefe de departamento", value: DEPARTMENT_CHIEF_ROLE },
         { title: "Decano", value: DEAN_ROLE },
+        { title: "Vicedecano Docente", value: VICE_DEAN_ROLE },
       ];
     },
   },
@@ -361,7 +363,12 @@ export default {
         });
         const role = this.$store.getters.primaryRole;
         this.$router.replace({
-          name: role === DEAN_ROLE ? "decano_solicitudes" : "dashboard",
+          name:
+            role === DEAN_ROLE
+              ? "decano_solicitudes"
+              : role === VICE_DEAN_ROLE
+              ? "vicedecano_solicitudes"
+              : "dashboard",
         });
       } catch (e) {
         this.error = this.getFriendlyLoginError(e);
@@ -546,7 +553,11 @@ export default {
       if (!this.assignment.username?.trim()) {
         errors.username = "El usuario es requerido.";
       }
-      if (![DEPARTMENT_CHIEF_ROLE, DEAN_ROLE].includes(this.assignment.role)) {
+      if (
+        ![DEPARTMENT_CHIEF_ROLE, DEAN_ROLE, VICE_DEAN_ROLE].includes(
+          this.assignment.role
+        )
+      ) {
         errors.role = "Seleccione un rol.";
       }
       if (
@@ -606,8 +617,11 @@ export default {
             (item) => item.__key === this.assignment.departmentKey
           )
         : null;
+      const isViceDean = this.assignment.role === VICE_DEAN_ROLE;
       let facultyId = isDepartmentChief
         ? this.getDepartmentFacultyId(department)
+        : isViceDean
+        ? null
         : this.assignment.facultyId;
 
       if (isDepartmentChief && !facultyId && department?.id) {
@@ -622,6 +636,7 @@ export default {
         return;
       }
 
+      const assignedRole = this.assignment.role;
       this.assignLoading = true;
       try {
         const exists = await this.userExists(username);
@@ -633,7 +648,7 @@ export default {
           application_code: APPLICATION_CODE,
           username,
           role: this.assignment.role,
-          facultad_id: Number(facultyId),
+          facultad_id: facultyId ? Number(facultyId) : null,
           departamento_id: isDepartmentChief ? Number(department.id) : null,
         });
 
@@ -651,6 +666,8 @@ export default {
         if (this.adminMessageType === "success") {
           this.adminMessage = isDepartmentChief
             ? "Jefe de Departamento asignado. Si ya existia uno para ese departamento se dejara activo solo el nuevo acceso."
+            : assignedRole === VICE_DEAN_ROLE
+            ? "Vicedecano Docente asignado. Si ya existia uno activo se dejara activo solo el nuevo acceso."
             : "Decano asignado. Si ya existia uno para esa facultad se dejara activo solo el nuevo acceso.";
         }
         this.assignLoading = false;
@@ -661,7 +678,12 @@ export default {
     if (this.$store.getters.isAuthenticated) {
       const role = this.$store.getters.primaryRole;
       this.$router.replace({
-        name: role === DEAN_ROLE ? "decano_solicitudes" : "dashboard",
+        name:
+          role === DEAN_ROLE
+            ? "decano_solicitudes"
+            : role === VICE_DEAN_ROLE
+            ? "vicedecano_solicitudes"
+            : "dashboard",
       });
     }
   },

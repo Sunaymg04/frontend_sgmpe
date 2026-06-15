@@ -81,14 +81,27 @@ export default {
           to: "/decano/historial",
         },
       ],
+      viceDeanItems: [
+        {
+          title: "Revisión Académica",
+          icon: "mdi-clipboard-check-outline",
+          to: "/vicedecano/solicitudes",
+        },
+        {
+          title: "Historial",
+          icon: "mdi-history",
+          to: "/vicedecano/historial",
+        },
+      ],
     };
   },
 
   computed: {
     items() {
-      return this.$store.getters.primaryRole === "decano"
-        ? this.deanItems
-        : this.defaultItems;
+      const role = this.$store.getters.primaryRole;
+      if (role === "decano") return this.deanItems;
+      if (role === "vicedecano_docente") return this.viceDeanItems;
+      return this.defaultItems;
     },
     drawer: {
       get() {
