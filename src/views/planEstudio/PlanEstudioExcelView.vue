@@ -23,7 +23,7 @@
 
     <v-card class="excel-card" :loading="loading">
       <div v-if="!loading && data" class="excel-scroll">
-        <table class="official-sheet">
+        <table ref="officialSheet" class="official-sheet">
           <colgroup>
             <col class="col-no" />
             <col class="col-name" />
@@ -129,8 +129,12 @@
               <td class="num">{{ num(row.fondo_tiempo) }}</td>
               <td class="num">{{ num(row.horas_clase) }}</td>
               <td class="num">{{ num(row.horas_practica_laboral) }}</td>
-              <td class="center">{{ row.tiene_examen_final ? 1 : "" }}</td>
-              <td class="center">{{ row.tiene_trabajo_curso ? 1 : "" }}</td>
+              <td class="center">
+                {{ toBooleanFlag(row.tiene_examen_final) ? 1 : "" }}
+              </td>
+              <td class="center">
+                {{ toBooleanFlag(row.tiene_trabajo_curso) ? 1 : "" }}
+              </td>
               <td class="num">{{ num(row.anios?.["1ro"]) }}</td>
               <td class="num">{{ num(row.anios?.["2do"]) }}</td>
               <td class="num">{{ num(row.anios?.["3ro"]) }}</td>
@@ -210,8 +214,12 @@
               <td class="num">{{ num(row.fondo_tiempo) }}</td>
               <td class="num">{{ num(row.horas_clase) }}</td>
               <td class="num">{{ num(row.horas_practica_laboral) }}</td>
-              <td class="center">{{ row.tiene_examen_final ? 1 : "" }}</td>
-              <td class="center">{{ row.tiene_trabajo_curso ? 1 : "" }}</td>
+              <td class="center">
+                {{ toBooleanFlag(row.tiene_examen_final) ? 1 : "" }}
+              </td>
+              <td class="center">
+                {{ toBooleanFlag(row.tiene_trabajo_curso) ? 1 : "" }}
+              </td>
               <td class="num">{{ num(row.anios?.["1ro"]) }}</td>
               <td class="num">{{ num(row.anios?.["2do"]) }}</td>
               <td class="num">{{ num(row.anios?.["3ro"]) }}</td>
@@ -245,8 +253,12 @@
               <td class="num">{{ num(row.fondo_tiempo) }}</td>
               <td class="num">{{ num(row.horas_clase) }}</td>
               <td class="num">{{ num(row.horas_practica_laboral) }}</td>
-              <td class="center">{{ row.tiene_examen_final ? 1 : "" }}</td>
-              <td class="center">{{ row.tiene_trabajo_curso ? 1 : "" }}</td>
+              <td class="center">
+                {{ toBooleanFlag(row.tiene_examen_final) ? 1 : "" }}
+              </td>
+              <td class="center">
+                {{ toBooleanFlag(row.tiene_trabajo_curso) ? 1 : "" }}
+              </td>
               <td class="num">{{ num(row.anios?.["1ro"]) }}</td>
               <td class="num">{{ num(row.anios?.["2do"]) }}</td>
               <td class="num">{{ num(row.anios?.["3ro"]) }}</td>
@@ -343,6 +355,9 @@ export default {
         .toLowerCase()
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
     },
+    toBooleanFlag(value) {
+      return value === true || value === 1 || value === "1";
+    },
     sectionRows(key) {
       return Array.isArray(this.data?.sections?.[key])
         ? this.data.sections[key]
@@ -402,15 +417,15 @@ export default {
         total.total += Number(row.fondo_tiempo || 0);
         total.clase += Number(row.horas_clase || 0);
         total.practica += Number(row.horas_practica_laboral || 0);
-        total.examenes += row.tiene_examen_final ? 1 : 0;
-        total.trabajos += row.tiene_trabajo_curso ? 1 : 0;
+        total.examenes += this.toBooleanFlag(row.tiene_examen_final) ? 1 : 0;
+        total.trabajos += this.toBooleanFlag(row.tiene_trabajo_curso) ? 1 : 0;
         years.forEach((year) => {
           const hours = Number(row.anios?.[year] || 0);
           total.anios[year] += hours;
           total.examenesPorAnio[year] +=
-            row.tiene_examen_final && hours > 0 ? 1 : 0;
+            this.toBooleanFlag(row.tiene_examen_final) && hours > 0 ? 1 : 0;
           total.trabajosPorAnio[year] +=
-            row.tiene_trabajo_curso && hours > 0 ? 1 : 0;
+            this.toBooleanFlag(row.tiene_trabajo_curso) && hours > 0 ? 1 : 0;
         });
       });
 
@@ -458,25 +473,81 @@ export default {
     },
     async descargarExcel() {
       this.downloading = true;
+      this.error = "";
       try {
         const res = await api.get(
           `/plan_estudio/${this.$route.params.id}/excel`,
           { responseType: "blob" }
         );
-        const url = window.URL.createObjectURL(new Blob([res.data]));
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `plan_estudio_${this.$route.params.id}.xls`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        this.descargarBlob(res.data, this.nombreArchivoExcel());
       } catch (error) {
         console.error(error);
-        this.error = "No se pudo descargar el Excel.";
+        try {
+          await this.descargarExcelDesdeVistaPrevia();
+        } catch (fallbackError) {
+          console.error(fallbackError);
+          this.error = "No se pudo descargar el Excel.";
+        }
       } finally {
         this.downloading = false;
       }
+    },
+    async descargarExcelDesdeVistaPrevia() {
+      if (!this.data) {
+        await this.cargarPreview();
+      }
+
+      await this.$nextTick();
+
+      if (!this.$refs.officialSheet) {
+        throw new Error("No hay vista previa para exportar.");
+      }
+
+      const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    table { border-collapse: collapse; table-layout: fixed; width: 1120px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
+    td, th { border: 1px solid #000; height: 23px; padding: 3px 5px; vertical-align: middle; }
+    .title-line, .document-title { border-left: 0; border-right: 0; text-align: center; font-weight: 700; }
+    .document-title { font-size: 15px; }
+    .meta { border-left: 0; border-right: 0; font-weight: 700; }
+    .signature { border-left: 0; border-right: 0; text-align: center; font-weight: 700; }
+    .green-header th, .section-row td, .continuation-row td, .continue-row td { text-align: center; font-weight: 700; }
+    .total-row td, .bold { font-weight: 700; }
+    .num { text-align: right; }
+    .center { text-align: center; }
+  </style>
+</head>
+<body>
+  ${this.$refs.officialSheet.outerHTML}
+</body>
+</html>`;
+
+      const blob = new Blob(["\ufeff", html], {
+        type: "application/vnd.ms-excel;charset=utf-8",
+      });
+      this.descargarBlob(blob, this.nombreArchivoExcel());
+    },
+    descargarBlob(data, filename) {
+      const blob =
+        data instanceof Blob
+          ? data
+          : new Blob([data], {
+              type: "application/vnd.ms-excel;charset=utf-8",
+            });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    },
+    nombreArchivoExcel() {
+      return `plan_estudio_${this.$route.params.id}.xls`;
     },
   },
   mounted() {

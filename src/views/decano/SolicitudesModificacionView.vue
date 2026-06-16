@@ -192,6 +192,7 @@
                         <span>Total</span>
                         <span>Clase</span>
                         <span>Práctica laboral</span>
+                        <span>Examen final</span>
                         <span>Año académico</span>
                       </div>
 
@@ -206,6 +207,7 @@
                           <strong>
                             {{ disciplina.horas_practica_laboral || 0 }} h
                           </strong>
+                          <strong></strong>
                           <small>
                             {{ disciplina.asignaturas.length }} asignaturas
                           </small>
@@ -221,6 +223,9 @@
                           <strong>{{ asignatura.horas_clase || 0 }} h</strong>
                           <strong>
                             {{ asignatura.horas_practica_laboral || 0 }} h
+                          </strong>
+                          <strong>
+                            {{ asignatura.tiene_examen_final ? 1 : "" }}
                           </strong>
                           <div class="anio-chip-list">
                             <v-chip
@@ -495,6 +500,9 @@ export default {
       if (Array.isArray(payload?.data)) return payload.data;
       return [];
     },
+    toBooleanFlag(value) {
+      return value === true || value === 1 || value === "1";
+    },
     async getFirst(endpoints) {
       let lastError;
       for (const endpoint of endpoints) {
@@ -569,6 +577,12 @@ export default {
                 horas_practica_laboral: Number(
                   asignatura.horas_practica_laboral || 0
                 ),
+                tiene_examen_final: this.toBooleanFlag(
+                  asignatura.tiene_examen_final
+                ),
+                tiene_trabajo_curso: this.toBooleanFlag(
+                  asignatura.tiene_trabajo_curso
+                ),
                 anios: this.normalizeList(
                   asignatura.anios || asignatura.anios_academicos
                 ),
@@ -592,6 +606,12 @@ export default {
               (asignatura) => ({
                 ...asignatura,
                 fondo_tiempo: this.asignaturaTotalHoras(asignatura),
+                tiene_examen_final: this.toBooleanFlag(
+                  asignatura.tiene_examen_final
+                ),
+                tiene_trabajo_curso: this.toBooleanFlag(
+                  asignatura.tiene_trabajo_curso
+                ),
                 anios: this.normalizeList(asignatura.anios),
               })
             ),
@@ -835,14 +855,14 @@ export default {
 }
 
 .detail-table {
-  min-width: 760px;
+  min-width: 860px;
 }
 
 .detail-table-head,
 .detail-disciplina-row,
 .detail-asignatura-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(110px, 1fr));
+  grid-template-columns: minmax(220px, 1.5fr) repeat(5, minmax(110px, 1fr));
   gap: 12px;
   align-items: center;
   padding: 10px 14px;

@@ -157,8 +157,10 @@ export default {
             ano: nombresAnos,
             programa: nombresProgramas,
             anoPrograma,
-            examenFinal: a.tiene_examen_final ? "Sí" : "No",
-            trabajoCurso: a.tiene_trabajo_curso ? "Sí" : "No",
+            examenFinal: this.toBooleanFlag(a.tiene_examen_final) ? "Sí" : "No",
+            trabajoCurso: this.toBooleanFlag(a.tiene_trabajo_curso)
+              ? "Sí"
+              : "No",
           };
         });
 
@@ -168,6 +170,9 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    toBooleanFlag(value) {
+      return value === true || value === 1 || value === "1";
     },
   },
   mounted() {

@@ -209,8 +209,8 @@ export default {
                 ? Number(valor.horas_clase || 0)
                 : Number(valor.fondo_tiempo || 0),
             horas_practica_laboral: Number(valor.horas_practica_laboral || 0),
-            tiene_examen_final: Boolean(valor.tiene_examen_final),
-            tiene_trabajo_curso: Boolean(valor.tiene_trabajo_curso),
+            tiene_examen_final: this.toBooleanFlag(valor.tiene_examen_final),
+            tiene_trabajo_curso: this.toBooleanFlag(valor.tiene_trabajo_curso),
 
             // disciplinas
 
@@ -291,6 +291,9 @@ export default {
       if (Array.isArray(payload?.data)) return payload.data;
       return [];
     },
+    toBooleanFlag(value) {
+      return value === true || value === 1 || value === "1";
+    },
 
     async guardar() {
       try {
@@ -348,8 +351,8 @@ export default {
         fondo_tiempo: this.fondoTiempoTotal,
         horas_clase: Number(this.form.horas_clase || 0),
         horas_practica_laboral: Number(this.form.horas_practica_laboral || 0),
-        tiene_examen_final: Boolean(this.form.tiene_examen_final),
-        tiene_trabajo_curso: Boolean(this.form.tiene_trabajo_curso),
+        tiene_examen_final: this.toBooleanFlag(this.form.tiene_examen_final),
+        tiene_trabajo_curso: this.toBooleanFlag(this.form.tiene_trabajo_curso),
       };
     },
   },

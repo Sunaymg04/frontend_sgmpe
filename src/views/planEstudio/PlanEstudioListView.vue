@@ -427,6 +427,14 @@
                             density="compact"
                             hide-details
                           />
+                          <v-switch
+                            v-model="asignatura.tiene_examen_final"
+                            color="primary"
+                            label="Examen final"
+                            density="compact"
+                            hide-details
+                            inset
+                          />
                           <v-select
                             v-if="asignatura.is_new"
                             v-model="asignatura.id_a_academico"
@@ -780,6 +788,7 @@
                   <span>Total</span>
                   <span>Clase</span>
                   <span>Práctica laboral</span>
+                  <span>Examen final</span>
                   <span>Año académico</span>
                 </div>
 
@@ -794,6 +803,7 @@
                     <strong>
                       {{ disciplina.horas_practica_laboral || 0 }} h
                     </strong>
+                    <strong></strong>
                     <small>
                       {{ disciplina.asignaturas.length }} asignaturas
                     </small>
@@ -817,6 +827,9 @@
                     <strong>
                       {{ asignatura.horas_practica_laboral || 0 }} h
                     </strong>
+                    <strong>{{
+                      asignatura.tiene_examen_final ? 1 : ""
+                    }}</strong>
                     <div class="anio-chip-list">
                       <v-chip
                         v-for="anio in asignatura.anios"
@@ -1150,6 +1163,9 @@ export default {
       if (Array.isArray(payload)) return payload;
       if (Array.isArray(payload?.data)) return payload.data;
       return [];
+    },
+    toBooleanFlag(value) {
+      return value === true || value === 1 || value === "1";
     },
     normalizeModalidades(payload) {
       if (Array.isArray(payload?.data?.modalidades)) {
@@ -1676,6 +1692,12 @@ export default {
             asignaturas: this.normalizeList(disciplina.asignaturas).map(
               (asignatura) => ({
                 ...asignatura,
+                tiene_examen_final: this.toBooleanFlag(
+                  asignatura.tiene_examen_final
+                ),
+                tiene_trabajo_curso: this.toBooleanFlag(
+                  asignatura.tiene_trabajo_curso
+                ),
                 anios: this.normalizeList(
                   asignatura.anios || asignatura.anios_academicos
                 ),
@@ -1700,6 +1722,10 @@ export default {
               : Number(asignatura.fondo_tiempo || 0),
           horas_practica_laboral: Number(
             asignatura.horas_practica_laboral || 0
+          ),
+          tiene_examen_final: this.toBooleanFlag(asignatura.tiene_examen_final),
+          tiene_trabajo_curso: this.toBooleanFlag(
+            asignatura.tiene_trabajo_curso
           ),
         })
       );
@@ -1731,6 +1757,12 @@ export default {
                 horas_practica_laboral: Number(
                   asignatura.horas_practica_laboral || 0
                 ),
+                tiene_examen_final: this.toBooleanFlag(
+                  asignatura.tiene_examen_final
+                ),
+                tiene_trabajo_curso: this.toBooleanFlag(
+                  asignatura.tiene_trabajo_curso
+                ),
               })
             ),
           })
@@ -1751,6 +1783,12 @@ export default {
               (asignatura) => ({
                 ...asignatura,
                 fondo_tiempo: this.asignaturaTotalHoras(asignatura),
+                tiene_examen_final: this.toBooleanFlag(
+                  asignatura.tiene_examen_final
+                ),
+                tiene_trabajo_curso: this.toBooleanFlag(
+                  asignatura.tiene_trabajo_curso
+                ),
               })
             ),
           })
@@ -1825,6 +1863,8 @@ export default {
         nombre: "",
         horas_clase: 0,
         horas_practica_laboral: 0,
+        tiene_examen_final: false,
+        tiene_trabajo_curso: false,
         id_a_academico: [],
         anios: [],
       });
@@ -1843,6 +1883,8 @@ export default {
         asignatura.nombre = "";
         asignatura.horas_clase = 0;
         asignatura.horas_practica_laboral = 0;
+        asignatura.tiene_examen_final = false;
+        asignatura.tiene_trabajo_curso = false;
         return;
       }
 
@@ -1850,6 +1892,12 @@ export default {
       asignatura.horas_clase = Number(seleccionada.horas_clase || 0);
       asignatura.horas_practica_laboral = Number(
         seleccionada.horas_practica_laboral || 0
+      );
+      asignatura.tiene_examen_final = this.toBooleanFlag(
+        seleccionada.tiene_examen_final
+      );
+      asignatura.tiene_trabajo_curso = this.toBooleanFlag(
+        seleccionada.tiene_trabajo_curso
       );
     },
     onAsignaturaAniosChange(asignatura, value) {
@@ -1931,6 +1979,12 @@ export default {
                 horas_clase: Number(asignatura.horas_clase || 0),
                 horas_practica_laboral: Number(
                   asignatura.horas_practica_laboral || 0
+                ),
+                tiene_examen_final: this.toBooleanFlag(
+                  asignatura.tiene_examen_final
+                ),
+                tiene_trabajo_curso: this.toBooleanFlag(
+                  asignatura.tiene_trabajo_curso
                 ),
                 id_a_academico: this.normalizeList(asignatura.id_a_academico),
                 anios: this.asignaturaAniosSeleccionados(asignatura),
@@ -2290,6 +2344,7 @@ export default {
     minmax(78px, 0.35fr)
     minmax(78px, 0.35fr)
     minmax(130px, 0.5fr)
+    minmax(96px, 0.35fr)
     minmax(160px, 0.7fr);
   align-items: center;
   gap: 12px;
@@ -2552,6 +2607,7 @@ export default {
     100px
     100px
     140px
+    130px
     minmax(170px, 0.8fr);
   gap: 10px;
 }
