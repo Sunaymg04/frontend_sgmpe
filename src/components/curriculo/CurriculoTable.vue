@@ -33,6 +33,7 @@ export default {
   data() {
     return {
       curriculos: [],
+      contextoDepartamento: null,
       loading: false,
       headers: [
         { title: "Código", key: "id" },
@@ -58,6 +59,7 @@ export default {
     async obtenerCurriculos() {
       try {
         this.loading = true;
+        this.contextoDepartamento = await this.cargarContextoDepartamento();
 
         const [resCur, resRel] = await Promise.all([
           api.get("/curriculo"),
@@ -68,16 +70,26 @@ export default {
         const relaciones = resRel.data.data;
 
         // contar disciplinas por currículo
-        this.curriculos = curriculos.map((c) => {
-          const cantidad = relaciones.filter(
-            (r) => r.id_curriculo === c.id
-          ).length;
+        this.curriculos = curriculos
+          .filter(
+            (c) =>
+              !this.contextoDepartamento ||
+              this.contextoDepartamento.curriculoIds.has(Number(c.id))
+          )
+          .map((c) => {
+            const cantidad = relaciones.filter((r) => {
+              if (r.id_curriculo !== c.id) return false;
+              if (!this.contextoDepartamento) return true;
+              return this.contextoDepartamento.disciplinaIds.has(
+                Number(r.id_disciplina)
+              );
+            }).length;
 
-          return {
-            ...c,
-            disciplinas: cantidad,
-          };
-        });
+            return {
+              ...c,
+              disciplinas: cantidad,
+            };
+          });
 
         console.log(this.curriculos);
       } catch (error) {
@@ -85,6 +97,49 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    normalizeList(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    },
+    getDepartmentId() {
+      const access = this.$store.getters.authAccess || [];
+      const jefe = access.find(
+        (item) => item?.active && item?.role === "jefe_departamento"
+      );
+      return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
+    },
+    async cargarContextoDepartamento() {
+      const departmentId = this.getDepartmentId();
+      if (!departmentId) return null;
+
+      const carrerasRes = await api.get(
+        `/departamento/${departmentId}/carreras`
+      );
+      const programaIds = this.normalizeList(carrerasRes.data).map((programa) =>
+        Number(programa.id)
+      );
+      const estructuras = await Promise.all(
+        programaIds.map((id) =>
+          api.get(`/progForm/${id}/estructura-curricular`).catch(() => ({
+            data: [],
+          }))
+        )
+      );
+      const curriculoIds = new Set();
+      const disciplinaIds = new Set();
+
+      estructuras.forEach((response) => {
+        this.normalizeList(response.data).forEach((curriculo) => {
+          curriculoIds.add(Number(curriculo.id));
+          this.normalizeList(curriculo.disciplinas).forEach((disciplina) => {
+            disciplinaIds.add(Number(disciplina.id));
+          });
+        });
+      });
+
+      return { programaIds, curriculoIds, disciplinaIds };
     },
   },
   mounted() {

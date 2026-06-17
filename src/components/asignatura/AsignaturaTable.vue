@@ -66,6 +66,7 @@ export default {
   data() {
     return {
       asignaturas: [],
+      contextoDepartamento: null,
       loading: false,
       headers: [
         { title: "Código", key: "id" },
@@ -97,6 +98,7 @@ export default {
     async obtenerAsignaturas() {
       try {
         this.loading = true;
+        this.contextoDepartamento = await this.cargarContextoDepartamento();
         const [resAsig, resDis, resRel, resAsigAno, resAno, resProg] =
           await Promise.all([
             api.get("/asignatura"),
@@ -128,41 +130,57 @@ export default {
           mapaPrograma[p.id] = p.nombre;
         });
 
-        this.asignaturas = asignaturas.map((a) => {
-          const rel = relaciones.filter((r) => r.id_asignatura === a.id);
+        this.asignaturas = asignaturas
+          .filter(
+            (a) =>
+              !this.contextoDepartamento ||
+              this.contextoDepartamento.asignaturaIds.has(Number(a.id))
+          )
+          .map((a) => {
+            const rel = relaciones.filter((r) => r.id_asignatura === a.id);
 
-          const nombresDisciplinas = rel.map(
-            (r) => mapaDisciplinas[r.id_disciplina]
-          );
-          const relAno = asignaturaAno.filter((r) => r.id_asignatura === a.id);
+            const nombresDisciplinas = rel.map(
+              (r) => mapaDisciplinas[r.id_disciplina]
+            );
+            const relAno = asignaturaAno.filter((r) => {
+              if (r.id_asignatura !== a.id) return false;
+              if (!this.contextoDepartamento) return true;
 
-          const nombresAnos = [];
-          const nombresProgramas = [];
-          const anoPrograma = [];
-          relAno.forEach((r) => {
-            const ano = mapaAno[r.id_a_academico];
+              const ano = mapaAno[r.id_a_academico];
+              return this.contextoDepartamento.programaIds.includes(
+                Number(ano?.id_prog_form)
+              );
+            });
 
-            if (ano) {
-              nombresAnos.push(ano.nombre);
+            const nombresAnos = [];
+            const nombresProgramas = [];
+            const anoPrograma = [];
+            relAno.forEach((r) => {
+              const ano = mapaAno[r.id_a_academico];
 
-              const programa = mapaPrograma[ano.id_prog_form] || "";
-              nombresProgramas.push(programa);
-              anoPrograma.push({ ano: ano.nombre, programa });
-            }
+              if (ano) {
+                nombresAnos.push(ano.nombre);
+
+                const programa = mapaPrograma[ano.id_prog_form] || "";
+                nombresProgramas.push(programa);
+                anoPrograma.push({ ano: ano.nombre, programa });
+              }
+            });
+
+            return {
+              ...a,
+              nombresDisciplinas,
+              ano: nombresAnos,
+              programa: nombresProgramas,
+              anoPrograma,
+              examenFinal: this.toBooleanFlag(a.tiene_examen_final)
+                ? "Sí"
+                : "No",
+              trabajoCurso: this.toBooleanFlag(a.tiene_trabajo_curso)
+                ? "Sí"
+                : "No",
+            };
           });
-
-          return {
-            ...a,
-            nombresDisciplinas,
-            ano: nombresAnos,
-            programa: nombresProgramas,
-            anoPrograma,
-            examenFinal: this.toBooleanFlag(a.tiene_examen_final) ? "Sí" : "No",
-            trabajoCurso: this.toBooleanFlag(a.tiene_trabajo_curso)
-              ? "Sí"
-              : "No",
-          };
-        });
 
         console.log(this.asignaturas);
       } catch (error) {
@@ -173,6 +191,49 @@ export default {
     },
     toBooleanFlag(value) {
       return value === true || value === 1 || value === "1";
+    },
+    normalizeList(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    },
+    getDepartmentId() {
+      const access = this.$store.getters.authAccess || [];
+      const jefe = access.find(
+        (item) => item?.active && item?.role === "jefe_departamento"
+      );
+      return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
+    },
+    async cargarContextoDepartamento() {
+      const departmentId = this.getDepartmentId();
+      if (!departmentId) return null;
+
+      const carrerasRes = await api.get(
+        `/departamento/${departmentId}/carreras`
+      );
+      const programaIds = this.normalizeList(carrerasRes.data).map((programa) =>
+        Number(programa.id)
+      );
+      const estructuras = await Promise.all(
+        programaIds.map((id) =>
+          api.get(`/progForm/${id}/estructura-curricular`).catch(() => ({
+            data: [],
+          }))
+        )
+      );
+      const asignaturaIds = new Set();
+
+      estructuras.forEach((response) => {
+        this.normalizeList(response.data).forEach((curriculo) => {
+          this.normalizeList(curriculo.disciplinas).forEach((disciplina) => {
+            this.normalizeList(disciplina.asignaturas).forEach((asignatura) => {
+              asignaturaIds.add(Number(asignatura.id));
+            });
+          });
+        });
+      });
+
+      return { programaIds, asignaturaIds };
     },
   },
   mounted() {

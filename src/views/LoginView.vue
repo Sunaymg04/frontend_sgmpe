@@ -245,7 +245,7 @@ import usersApi from "@/services/usersApi";
 const APPLICATION_CODE = "gestion_plan_estudio";
 const DEPARTMENT_CHIEF_ROLE = "jefe_departamento";
 const DEAN_ROLE = "decano";
-const VICE_DEAN_ROLE = "vicedecano_docente";
+const VICE_RECTOR_ROLE = "vicerrector_docente";
 
 export default {
   name: "LoginView",
@@ -304,7 +304,7 @@ export default {
       return [
         { title: "Jefe de departamento", value: DEPARTMENT_CHIEF_ROLE },
         { title: "Decano", value: DEAN_ROLE },
-        { title: "Vicedecano Docente", value: VICE_DEAN_ROLE },
+        { title: "Vicerrector Docente", value: VICE_RECTOR_ROLE },
       ];
     },
   },
@@ -366,8 +366,8 @@ export default {
           name:
             role === DEAN_ROLE
               ? "decano_solicitudes"
-              : role === VICE_DEAN_ROLE
-              ? "vicedecano_solicitudes"
+              : role === VICE_RECTOR_ROLE
+              ? "vicerrector_solicitudes"
               : "dashboard",
         });
       } catch (e) {
@@ -554,7 +554,7 @@ export default {
         errors.username = "El usuario es requerido.";
       }
       if (
-        ![DEPARTMENT_CHIEF_ROLE, DEAN_ROLE, VICE_DEAN_ROLE].includes(
+        ![DEPARTMENT_CHIEF_ROLE, DEAN_ROLE, VICE_RECTOR_ROLE].includes(
           this.assignment.role
         )
       ) {
@@ -617,10 +617,10 @@ export default {
             (item) => item.__key === this.assignment.departmentKey
           )
         : null;
-      const isViceDean = this.assignment.role === VICE_DEAN_ROLE;
+      const isViceRector = this.assignment.role === VICE_RECTOR_ROLE;
       let facultyId = isDepartmentChief
         ? this.getDepartmentFacultyId(department)
-        : isViceDean
+        : isViceRector
         ? null
         : this.assignment.facultyId;
 
@@ -666,8 +666,8 @@ export default {
         if (this.adminMessageType === "success") {
           this.adminMessage = isDepartmentChief
             ? "Jefe de Departamento asignado. Si ya existia uno para ese departamento se dejara activo solo el nuevo acceso."
-            : assignedRole === VICE_DEAN_ROLE
-            ? "Vicedecano Docente asignado. Si ya existia uno activo se dejara activo solo el nuevo acceso."
+            : assignedRole === VICE_RECTOR_ROLE
+            ? "Vicerrector Docente asignado. Si ya existia uno activo se dejara activo solo el nuevo acceso."
             : "Decano asignado. Si ya existia uno para esa facultad se dejara activo solo el nuevo acceso.";
         }
         this.assignLoading = false;
@@ -681,8 +681,8 @@ export default {
         name:
           role === DEAN_ROLE
             ? "decano_solicitudes"
-            : role === VICE_DEAN_ROLE
-            ? "vicedecano_solicitudes"
+            : role === VICE_RECTOR_ROLE
+            ? "vicerrector_solicitudes"
             : "dashboard",
       });
     }

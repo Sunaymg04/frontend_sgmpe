@@ -151,10 +151,15 @@ export default {
     role() {
       return this.formatRole(this.currentAccess?.role);
     },
+    isViceRectorDocente() {
+      return this.currentAccess?.role === "vicerrector_docente";
+    },
     departmentId() {
+      if (this.isViceRectorDocente) return null;
       return this.currentAccess?.departamento_id ?? null;
     },
     facultyId() {
+      if (this.isViceRectorDocente) return null;
       return this.currentAccess?.facultad_id ?? null;
     },
     recentActivity() {
@@ -195,7 +200,7 @@ export default {
         jefe_deparatamento: "Jefe de Departamento",
         decano: "Decano",
         rector: "Rector",
-        vicedecano_docente: "Vicedecano Docente",
+        vicerrector_docente: "Vicerrector Docente",
       };
 
       if (labels[normalized]) {
@@ -310,12 +315,20 @@ export default {
         if (this.currentAccess?.role === "decano") {
           return;
         }
+        if (this.isViceRectorDocente) {
+          this.contextName = "";
+          return;
+        }
         this.loadDepartmentName(value);
       },
     },
     facultyId: {
       immediate: true,
       handler(value) {
+        if (this.isViceRectorDocente) {
+          this.contextName = "";
+          return;
+        }
         if (this.currentAccess?.role !== "decano") {
           return;
         }

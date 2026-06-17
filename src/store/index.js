@@ -7,7 +7,7 @@ const VALID_ROLES = [
   "jefe_departamento",
   "decano",
   "rector",
-  "vicedecano_docente",
+  "vicerrector_docente",
 ];
 const ACTIVITY_MAX = 30;
 

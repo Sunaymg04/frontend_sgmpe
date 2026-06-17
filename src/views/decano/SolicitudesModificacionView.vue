@@ -57,6 +57,312 @@
           No hay solicitudes enviadas para revisar.
         </v-alert>
 
+        <template v-else-if="mostrarHistorialAgrupado">
+          <v-text-field
+            v-model="historialSearch"
+            label="Buscar por carrera"
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            class="mb-4"
+          />
+
+          <v-alert
+            v-if="!historialAgrupadoPorCarrera.length"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+          >
+            No hay planes en el historial para esa carrera.
+          </v-alert>
+
+          <v-expansion-panels
+            v-else
+            variant="accordion"
+            multiple
+            class="career-history"
+          >
+            <v-expansion-panel
+              v-for="grupo in historialAgrupadoPorCarrera"
+              :key="grupo.nombre"
+              class="career-panel"
+            >
+              <v-expansion-panel-title>
+                <div class="career-panel-title">
+                  <div>
+                    <strong>{{ grupo.nombre }}</strong>
+                    <small>{{ grupo.planes.length }} planes en historial</small>
+                  </div>
+                  <v-chip color="primary" variant="tonal" size="small">
+                    {{ grupo.planes.length }}
+                  </v-chip>
+                </div>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <div class="request-list">
+                  <v-card
+                    v-for="plan in grupo.planes"
+                    :key="plan.id"
+                    class="request-item"
+                    elevation="0"
+                  >
+                    <div class="request-main">
+                      <div>
+                        <div
+                          class="text-overline text-primary font-weight-bold"
+                        >
+                          {{ nombreCarrera(plan) }}
+                        </div>
+                        <h3>{{ plan.nombre }}</h3>
+                        <p class="text-body-2 text-medium-emphasis mb-0">
+                          Curso
+                          {{ plan.curso?.curso || plan.curso_nombre || "-" }}
+                          ·
+                          {{
+                            plan.modalidad?.nombre ||
+                            plan.modalidad_nombre ||
+                            "-"
+                          }}
+                        </p>
+                      </div>
+                      <v-chip
+                        :color="solicitudColor(plan)"
+                        variant="tonal"
+                        size="small"
+                      >
+                        {{ solicitudLabel(plan) }}
+                      </v-chip>
+                    </div>
+
+                    <div v-if="!planEsNuevo(plan)" class="changes-panel">
+                      <div class="changes-title">
+                        <v-icon color="secondary">
+                          mdi-compare-horizontal
+                        </v-icon>
+                        <strong>Cambios propuestos</strong>
+                      </div>
+                      <div
+                        v-for="line in resumenLineas(plan)"
+                        :key="line"
+                        class="change-line modified"
+                      >
+                        {{ line }}
+                      </div>
+                    </div>
+
+                    <v-alert
+                      v-else
+                      type="info"
+                      variant="tonal"
+                      density="comfortable"
+                      class="mt-4"
+                    >
+                      Se ha creado un nuevo plan de estudio para revisión.
+                    </v-alert>
+
+                    <div class="full-plan-actions">
+                      <v-btn
+                        variant="tonal"
+                        color="primary"
+                        :loading="detalleLoading === plan.id"
+                        @click="toggleDetallePlan(plan)"
+                      >
+                        <v-icon class="mr-2">
+                          {{
+                            detalleAbiertoId === plan.id
+                              ? "mdi-eye-off-outline"
+                              : "mdi-eye-outline"
+                          }}
+                        </v-icon>
+                        {{
+                          detalleAbiertoId === plan.id
+                            ? "Ocultar plan"
+                            : "Ver plan completo"
+                        }}
+                      </v-btn>
+                    </div>
+
+                    <v-expand-transition>
+                      <div
+                        v-if="detalleAbiertoId === plan.id"
+                        class="full-plan-panel"
+                      >
+                        <v-alert
+                          v-if="detalleError"
+                          type="error"
+                          variant="tonal"
+                          density="comfortable"
+                        >
+                          {{ detalleError }}
+                        </v-alert>
+
+                        <template v-else>
+                          <div class="detail-metrics">
+                            <div>
+                              <span>Currículos</span>
+                              <strong>{{ detalleStats.curriculos }}</strong>
+                            </div>
+                            <div>
+                              <span>Disciplinas</span>
+                              <strong>{{ detalleStats.disciplinas }}</strong>
+                            </div>
+                            <div>
+                              <span>Asignaturas</span>
+                              <strong>{{ detalleStats.asignaturas }}</strong>
+                            </div>
+                            <div>
+                              <span>Horas registradas</span>
+                              <strong>{{ detalleStats.horas }} h</strong>
+                            </div>
+                          </div>
+
+                          <v-alert
+                            v-if="!detalleCurriculos.length"
+                            type="info"
+                            variant="tonal"
+                            density="comfortable"
+                          >
+                            Este plan no tiene currículos asociados o aún no se
+                            pudo resolver su estructura.
+                          </v-alert>
+
+                          <div
+                            v-for="curriculo in detalleCurriculos"
+                            :key="curriculo.id"
+                            class="detail-curriculo"
+                          >
+                            <div class="curriculo-detail-title">
+                              <div>
+                                <span>Currículo</span>
+                                <strong>{{ curriculo.nombre }}</strong>
+                              </div>
+                              <v-chip
+                                color="primary"
+                                variant="tonal"
+                                size="small"
+                              >
+                                {{ countAsignaturas(curriculo) }} asignaturas
+                              </v-chip>
+                            </div>
+
+                            <div class="detail-table">
+                              <div class="detail-table-head">
+                                <span>Disciplina y asignatura</span>
+                                <span>Total</span>
+                                <span>Clase</span>
+                                <span>Práctica laboral</span>
+                                <span>Examen final</span>
+                                <span>Año académico</span>
+                              </div>
+
+                              <template
+                                v-for="disciplina in curriculo.disciplinas"
+                                :key="disciplina.id"
+                              >
+                                <div class="detail-disciplina-row">
+                                  <span>{{ disciplina.nombre }}</span>
+                                  <strong>
+                                    {{ disciplina.fondo_tiempo || 0 }} h
+                                  </strong>
+                                  <strong>
+                                    {{ disciplina.horas_clase || 0 }} h
+                                  </strong>
+                                  <strong>
+                                    {{
+                                      `${
+                                        disciplina.horas_practica_laboral || 0
+                                      } h`
+                                    }}
+                                  </strong>
+                                  <strong></strong>
+                                  <small>
+                                    {{ disciplina.asignaturas.length }}
+                                    asignaturas
+                                  </small>
+                                </div>
+
+                                <div
+                                  v-for="asignatura in disciplina.asignaturas"
+                                  :key="asignatura.id"
+                                  class="detail-asignatura-row"
+                                >
+                                  <span>{{ asignatura.nombre }}</span>
+                                  <strong>
+                                    {{ asignatura.fondo_tiempo || 0 }} h
+                                  </strong>
+                                  <strong>
+                                    {{ asignatura.horas_clase || 0 }} h
+                                  </strong>
+                                  <strong>
+                                    {{
+                                      `${
+                                        asignatura.horas_practica_laboral || 0
+                                      } h`
+                                    }}
+                                  </strong>
+                                  <strong>
+                                    {{ asignatura.tiene_examen_final ? 1 : "" }}
+                                  </strong>
+                                  <div class="anio-chip-list">
+                                    <v-chip
+                                      v-for="anio in normalizeList(
+                                        asignatura.anios
+                                      )"
+                                      :key="
+                                        anio.id || anio.identificador || anio
+                                      "
+                                      size="small"
+                                      variant="outlined"
+                                    >
+                                      {{ anio.identificador || anio }}
+                                    </v-chip>
+                                    <v-chip
+                                      v-if="
+                                        !normalizeList(asignatura.anios).length
+                                      "
+                                      size="small"
+                                      color="warning"
+                                      variant="tonal"
+                                    >
+                                      Sin año
+                                    </v-chip>
+                                  </div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </v-expand-transition>
+
+                    <div class="request-actions">
+                      <v-btn
+                        variant="tonal"
+                        color="success"
+                        :disabled="Boolean(accionLoading)"
+                        @click="abrirExcel(plan)"
+                      >
+                        <v-icon class="mr-2">mdi-microsoft-excel</v-icon>
+                        Generar Excel
+                      </v-btn>
+                      <v-btn
+                        variant="outlined"
+                        color="success"
+                        :disabled="Boolean(accionLoading)"
+                        @click="descargarExcel(plan)"
+                      >
+                        <v-icon class="mr-2">mdi-download</v-icon>
+                        Descargar Excel
+                      </v-btn>
+                    </div>
+                  </v-card>
+                </div>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </template>
+
         <div v-else class="request-list">
           <v-card
             v-for="plan in solicitudes"
@@ -253,6 +559,27 @@
               </div>
             </v-expand-transition>
 
+            <div v-if="isHistorial" class="request-actions">
+              <v-btn
+                variant="tonal"
+                color="success"
+                :disabled="Boolean(accionLoading)"
+                @click="abrirExcel(plan)"
+              >
+                <v-icon class="mr-2">mdi-microsoft-excel</v-icon>
+                Generar Excel
+              </v-btn>
+              <v-btn
+                variant="outlined"
+                color="success"
+                :disabled="Boolean(accionLoading)"
+                @click="descargarExcel(plan)"
+              >
+                <v-icon class="mr-2">mdi-download</v-icon>
+                Descargar Excel
+              </v-btn>
+            </div>
+
             <div v-if="!isHistorial" class="request-actions">
               <v-btn
                 variant="outlined"
@@ -294,6 +621,7 @@ export default {
       loading: false,
       accionLoading: "",
       solicitudes: [],
+      historialSearch: "",
       detalleAbiertoId: null,
       detalleLoading: null,
       detalleError: "",
@@ -307,30 +635,33 @@ export default {
     reviewerRole() {
       return this.$route?.meta?.reviewerRole || "decano";
     },
-    isViceDeanReview() {
-      return this.reviewerRole === "vicedecano_docente";
+    isViceRectorReview() {
+      return this.reviewerRole === "vicerrector_docente";
+    },
+    mostrarHistorialAgrupado() {
+      return this.isHistorial && this.isViceRectorReview;
     },
     requiresFaculty() {
-      return !this.isViceDeanReview;
+      return !this.isViceRectorReview;
     },
     pageTitle() {
-      return this.isViceDeanReview
+      return this.isViceRectorReview
         ? "Revisión Final Académica"
         : "Revisión Académica";
     },
     pageSubtitle() {
-      return this.isViceDeanReview
+      return this.isViceRectorReview
         ? "Solicitudes aprobadas por el decano y enviadas para revisión final."
         : "Solicitudes enviadas por los departamentos de la facultad.";
     },
     solicitudesRouteName() {
-      return this.isViceDeanReview
-        ? "vicedecano_solicitudes"
+      return this.isViceRectorReview
+        ? "vicerrector_solicitudes"
         : "decano_solicitudes";
     },
     historialRouteName() {
-      return this.isViceDeanReview
-        ? "vicedecano_historial"
+      return this.isViceRectorReview
+        ? "vicerrector_historial"
         : "decano_historial";
     },
     facultyId() {
@@ -341,14 +672,44 @@ export default {
       return reviewer?.facultad_id ?? null;
     },
     solicitudesEndpoint() {
-      return this.isViceDeanReview
-        ? "/plan_estudio/vicedecano/solicitudes"
+      return this.isViceRectorReview
+        ? "/plan_estudio/vicerrector/solicitudes"
         : "/plan_estudio/decano/solicitudes";
     },
     historialEndpoint() {
-      return this.isViceDeanReview
-        ? "/plan_estudio/vicedecano/historial"
+      return this.isViceRectorReview
+        ? "/plan_estudio/vicerrector/historial"
         : "/plan_estudio/decano/historial";
+    },
+    historialAgrupadoPorCarrera() {
+      if (!this.mostrarHistorialAgrupado) return [];
+
+      const search = this.historialSearch.trim().toLowerCase();
+      const grupos = this.solicitudes.reduce((acc, plan) => {
+        const nombre = this.nombreCarrera(plan);
+        if (search && !nombre.toLowerCase().includes(search)) return acc;
+
+        if (!acc[nombre]) {
+          acc[nombre] = {
+            nombre,
+            planes: [],
+          };
+        }
+
+        acc[nombre].planes.push(plan);
+        return acc;
+      }, {});
+
+      return Object.values(grupos)
+        .map((grupo) => ({
+          ...grupo,
+          planes: grupo.planes.sort(
+            (a, b) =>
+              new Date(b.updated_at || b.created_at || 0) -
+              new Date(a.updated_at || a.created_at || 0)
+          ),
+        }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
     },
     detalleStats() {
       const stats = {
@@ -400,7 +761,7 @@ export default {
       return plan?.tipo_plan === "original";
     },
     solicitudLabelBase(plan) {
-      if (this.isViceDeanReview) {
+      if (this.isViceRectorReview) {
         return this.planEsNuevo(plan)
           ? "Nuevo plan para revisión final"
           : "Modificación para revisión final";
@@ -421,7 +782,13 @@ export default {
       if (["rechazado", "modificacion_cancelada"].includes(estado)) {
         return "error";
       }
-      if (["enviado_decano", "enviado_vicedecano"].includes(estado)) {
+      if (
+        [
+          "enviado_decano",
+          "enviado_vicedecano",
+          "enviado_vicerrector",
+        ].includes(estado)
+      ) {
         return "info";
       }
       if (this.planEsNuevo(plan)) return "primary";
@@ -433,14 +800,17 @@ export default {
         enviado_decano: this.planEsNuevo(plan)
           ? "Nuevo plan pendiente"
           : "Modificación pendiente",
-        enviado_vicedecano: this.isViceDeanReview
+        enviado_vicedecano: this.isViceRectorReview
           ? "Pendiente de revisión final"
-          : "Enviado al vicedecano docente",
+          : "Enviado al vicerrector docente",
+        enviado_vicerrector: this.isViceRectorReview
+          ? "Pendiente de revisión final"
+          : "Enviado al vicerrector docente",
         vigente: this.planEsNuevo(plan)
           ? "Plan aprobado"
           : "Modificación aprobada",
         rechazado: "Plan rechazado",
-        modificacion_cancelada: this.isViceDeanReview
+        modificacion_cancelada: this.isViceRectorReview
           ? "Modificación rechazada"
           : "Modificación cancelada",
       };
@@ -502,6 +872,14 @@ export default {
     },
     toBooleanFlag(value) {
       return value === true || value === 1 || value === "1";
+    },
+    nombreCarrera(plan) {
+      return (
+        plan?.programa_formacion?.nombre ||
+        plan?.programa_nombre ||
+        plan?.programa?.nombre ||
+        "Carrera sin nombre"
+      );
     },
     async getFirst(endpoints) {
       let lastError;
@@ -651,11 +1029,21 @@ export default {
         0
       );
     },
+    abrirExcel(plan) {
+      this.$router.push({
+        name: "plan_estudio_excel",
+        params: { id: plan.id },
+      });
+    },
+    descargarExcel(plan) {
+      const baseUrl = String(api.defaults.baseURL || "").replace(/\/$/, "");
+      window.open(`${baseUrl}/plan_estudio/${plan.id}/excel`, "_blank");
+    },
     async aprobarSolicitud(plan) {
       this.accionLoading = `aprobar-${plan.id}`;
       try {
-        const endpoint = this.isViceDeanReview
-          ? `/plan_estudio/${plan.id}/vicedecano/aprobar`
+        const endpoint = this.isViceRectorReview
+          ? `/plan_estudio/${plan.id}/vicerrector/aprobar`
           : `/plan_estudio/${plan.id}/aprobar`;
         await api.post(endpoint, {
           username: this.$store.getters.authUsername,
@@ -664,9 +1052,9 @@ export default {
           ? "Plan aprobado correctamente"
           : "Modificación aprobada correctamente";
         toast.success(
-          this.isViceDeanReview
+          this.isViceRectorReview
             ? `${message}. Queda vigente`
-            : `${message}. Enviado al vicedecano docente`
+            : `${message}. Enviado al vicerrector docente`
         );
         this.detalleAbiertoId = null;
         await this.cargarSolicitudes();
@@ -682,8 +1070,8 @@ export default {
     async cancelarSolicitud(plan) {
       this.accionLoading = `cancelar-${plan.id}`;
       try {
-        const endpoint = this.isViceDeanReview
-          ? `/plan_estudio/${plan.id}/vicedecano/cancelar`
+        const endpoint = this.isViceRectorReview
+          ? `/plan_estudio/${plan.id}/vicerrector/cancelar`
           : `/plan_estudio/${plan.id}/cancelar`;
         await api.post(endpoint, {
           username: this.$store.getters.authUsername,
@@ -713,6 +1101,7 @@ export default {
       this.detalleAbiertoId = null;
       this.detalleCurriculos = [];
       this.detalleError = "";
+      this.historialSearch = "";
       this.cargarSolicitudes();
     },
   },
@@ -760,6 +1149,34 @@ export default {
 .request-list {
   display: grid;
   gap: 14px;
+}
+
+.career-history {
+  display: grid;
+  gap: 12px;
+}
+
+.career-panel {
+  border: 1px solid #dbe3ef;
+  border-radius: 8px !important;
+}
+
+.career-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.career-panel-title > div {
+  display: grid;
+  gap: 2px;
+}
+
+.career-panel-title small {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .request-item {

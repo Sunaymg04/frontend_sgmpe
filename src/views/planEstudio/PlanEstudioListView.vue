@@ -2,10 +2,10 @@
   <v-container>
     <div class="page-header">
       <div>
-        <h2 class="mb-1">Planes de estudio</h2>
+        <h2 class="mb-1">{{ pageTitle }}</h2>
       </div>
 
-      <v-btn color="primary" @click="abrirCrear">
+      <v-btn v-if="!soloVigentes" color="primary" @click="abrirCrear">
         <v-icon class="mr-2">mdi-plus</v-icon>
         Nuevo plan de estudio
       </v-btn>
@@ -82,6 +82,7 @@
               <v-icon>mdi-eye-outline</v-icon>
             </v-btn>
             <v-btn
+              v-if="!soloVigentes"
               icon
               variant="text"
               color="secondary"
@@ -100,7 +101,7 @@
               <v-icon>mdi-microsoft-excel</v-icon>
             </v-btn>
             <v-btn
-              v-if="puedeEnviarModificacion(item)"
+              v-if="!soloVigentes && puedeEnviarModificacion(item)"
               icon
               variant="text"
               color="success"
@@ -111,6 +112,7 @@
               <v-icon>mdi-send-outline</v-icon>
             </v-btn>
             <v-btn
+              v-if="!soloVigentes"
               icon
               variant="text"
               color="error"
@@ -124,8 +126,18 @@
       </v-data-table>
     </v-card>
 
-    <v-dialog v-model="dialogCrear" max-width="1080" persistent>
-      <v-card class="wizard-card">
+    <v-dialog
+      v-model="dialogCrear"
+      max-width="min(1280px, 96vw)"
+      persistent
+      scrollable
+    >
+      <v-card
+        class="wizard-card"
+        :class="{
+          'wizard-card-structure': modoFormulario === 'modificar' && step === 3,
+        }"
+      >
         <div class="wizard-header">
           <div>
             <div class="text-h6 font-weight-bold">
@@ -172,7 +184,7 @@
           {{ formNotice }}
         </v-alert>
 
-        <v-card-text class="px-0">
+        <v-card-text class="wizard-body px-0">
           <section v-if="step === 1">
             <div class="wizard-grid">
               <v-alert
@@ -302,7 +314,7 @@
                 <div class="text-body-2 text-medium-emphasis">
                   {{
                     modoFormulario === "modificar"
-                      ? "Ajuste horas, agregue disciplinas y agregue asignaturas existentes o nuevas."
+                      ? "Ajuste horas, edite nombres, agregue o elimine disciplinas y asignaturas."
                       : "Las asignaturas se muestran agrupadas por currículo y disciplina."
                   }}
                 </div>
@@ -322,6 +334,16 @@
                     <v-chip size="small" color="primary" variant="tonal">
                       {{ curriculo.disciplinas.length }} disciplinas
                     </v-chip>
+                    <v-btn
+                      v-if="modoFormulario === 'modificar'"
+                      size="small"
+                      variant="text"
+                      color="secondary"
+                      @click.stop="abrirEditarCurriculo(curriculo)"
+                    >
+                      <v-icon class="mr-1">mdi-pencil-outline</v-icon>
+                      Currículo
+                    </v-btn>
                     <v-btn
                       v-if="modoFormulario === 'modificar'"
                       size="small"
@@ -350,11 +372,31 @@
                         v-if="modoFormulario === 'modificar'"
                         size="small"
                         variant="text"
+                        color="secondary"
+                        @click="abrirEditarDisciplina(disciplina)"
+                      >
+                        <v-icon class="mr-1">mdi-pencil-outline</v-icon>
+                        Editar
+                      </v-btn>
+                      <v-btn
+                        v-if="modoFormulario === 'modificar'"
+                        size="small"
+                        variant="text"
                         color="primary"
                         @click="agregarAsignatura(disciplina)"
                       >
                         <v-icon class="mr-1">mdi-plus</v-icon>
                         Asignatura
+                      </v-btn>
+                      <v-btn
+                        v-if="modoFormulario === 'modificar'"
+                        size="small"
+                        variant="text"
+                        color="error"
+                        @click="abrirEliminarDisciplina(curriculo, disciplina)"
+                      >
+                        <v-icon class="mr-1">mdi-delete-outline</v-icon>
+                        Eliminar
                       </v-btn>
                     </div>
 
@@ -436,7 +478,6 @@
                             inset
                           />
                           <v-select
-                            v-if="asignatura.is_new"
                             v-model="asignatura.id_a_academico"
                             :items="aniosAcademicosPrograma"
                             item-title="nombre_completo"
@@ -453,11 +494,12 @@
                             "
                           />
                           <v-btn
-                            v-if="asignatura.is_new"
                             icon
                             variant="text"
                             color="error"
-                            @click="quitarAsignatura(disciplina, asignatura)"
+                            @click="
+                              abrirEliminarAsignatura(disciplina, asignatura)
+                            "
                           >
                             <v-icon>mdi-close-circle-outline</v-icon>
                           </v-btn>
@@ -913,6 +955,55 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="dialogEditarEstructura" max-width="560" persistent>
+      <v-card class="discipline-dialog">
+        <v-card-title class="d-flex align-center ga-2">
+          <v-icon color="secondary">mdi-pencil-outline</v-icon>
+          {{ editarEstructuraTitulo }}
+        </v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model.trim="estructuraEditando.nombre"
+            label="Nombre"
+            prepend-inner-icon="mdi-form-textbox"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="estructuraEditando.error"
+            autofocus
+            @keyup.enter="guardarEdicionEstructura"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="cerrarEditarEstructura">
+            Cancelar
+          </v-btn>
+          <v-btn color="primary" @click="guardarEdicionEstructura">
+            Guardar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="dialogConfirmarEstructura" max-width="520" persistent>
+      <v-card class="discipline-dialog">
+        <v-card-title class="d-flex align-center ga-2">
+          <v-icon color="error">mdi-alert-outline</v-icon>
+          Confirmar eliminación
+        </v-card-title>
+        <v-card-text>
+          {{ eliminarEstructuraMensaje }}
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="cerrarConfirmarEstructura">
+            Cancelar
+          </v-btn>
+          <v-btn color="error" @click="confirmarEliminacionEstructura">
+            Eliminar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -927,6 +1018,7 @@ export default {
       search: "",
       loading: false,
       planes: [],
+      departamentoProgramaIds: [],
       programas: [],
       modalidades: [],
       calificaciones: [],
@@ -938,6 +1030,8 @@ export default {
       dialogDetalle: false,
       dialogEliminar: false,
       dialogNuevaDisciplina: false,
+      dialogEditarEstructura: false,
+      dialogConfirmarEstructura: false,
       modoFormulario: "crear",
       planOriginalModificacion: null,
       planAEliminar: null,
@@ -945,6 +1039,17 @@ export default {
       nuevaDisciplina: {
         nombre: "",
         error: "",
+      },
+      estructuraEditando: {
+        tipo: "",
+        item: null,
+        nombre: "",
+        error: "",
+      },
+      eliminacionPendiente: {
+        tipo: "",
+        item: null,
+        parent: null,
       },
       step: 1,
       steps: ["Datos base", "Currículos", "Estructura", "Resumen"],
@@ -990,10 +1095,19 @@ export default {
       );
       return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
     },
+    soloVigentes() {
+      return Boolean(this.$route?.meta?.soloVigentes);
+    },
+    pageTitle() {
+      return this.soloVigentes ? "Planes vigentes" : "Planes de estudio";
+    },
     planesFiltrados() {
-      if (!this.search) return this.planes;
+      const planes = this.soloVigentes
+        ? this.planes.filter((item) => item.estado === "vigente")
+        : this.planes;
+      if (!this.search) return planes;
       const needle = this.search.toLowerCase();
-      return this.planes.filter((item) =>
+      return planes.filter((item) =>
         [
           item?.id,
           item?.nombre,
@@ -1020,8 +1134,26 @@ export default {
         this.planAEliminar?.nombre || "seleccionado"
       }?`;
     },
+    editarEstructuraTitulo() {
+      return this.estructuraEditando.tipo === "curriculo"
+        ? "Editar currículo"
+        : "Editar disciplina";
+    },
+    eliminarEstructuraMensaje() {
+      const nombre = this.eliminacionPendiente.item?.nombre || "este elemento";
+      return this.eliminacionPendiente.tipo === "disciplina"
+        ? `¿Desea eliminar la disciplina "${nombre}" de esta modificación?`
+        : `¿Desea eliminar la asignatura "${nombre}" de esta modificación?`;
+    },
     programasDepartamento() {
       return this.programas;
+    },
+    programasConPlanInicialActivo() {
+      return new Set(
+        this.planes
+          .filter((plan) => this.planBloqueaCreacionInicial(plan))
+          .map((plan) => Number(plan.id_prog_form))
+      );
     },
     modalidadesPrograma() {
       return this.modalidades;
@@ -1214,24 +1346,30 @@ export default {
         const modalidades = this.toMap(this.normalizeList(modRes.data));
         const calificaciones = this.toMap(this.normalizeList(calRes.data));
         const cursos = this.toMap(this.normalizeList(cursoRes.data));
+        this.departamentoProgramaIds =
+          await this.cargarIdsProgramasDepartamento();
 
-        this.planes = this.normalizeList(planRes.data).map((plan) => ({
-          ...plan,
-          programa_nombre:
-            programas[plan.id_prog_form]?.nombre ||
-            programas[plan.id_programa]?.nombre ||
-            "",
-          modalidad_nombre:
-            modalidades[plan.id_modalidad]?.nombre ||
-            modalidades[plan.id_modalidad_carrera]?.nombre ||
-            "",
-          calificacion_nombre:
-            calificaciones[plan.id_calificacion]?.nombre || "",
-          curso_nombre:
-            cursos[plan.id_curso]?.nombre || cursos[plan.id_curso]?.curso || "",
-          estado: plan.estado || "esperando_aprobacion",
-          tipo_plan: plan.tipo_plan || "original",
-        }));
+        this.planes = this.normalizeList(planRes.data)
+          .filter((plan) => this.planPerteneceAlDepartamento(plan))
+          .map((plan) => ({
+            ...plan,
+            programa_nombre:
+              programas[plan.id_prog_form]?.nombre ||
+              programas[plan.id_programa]?.nombre ||
+              "",
+            modalidad_nombre:
+              modalidades[plan.id_modalidad]?.nombre ||
+              modalidades[plan.id_modalidad_carrera]?.nombre ||
+              "",
+            calificacion_nombre:
+              calificaciones[plan.id_calificacion]?.nombre || "",
+            curso_nombre:
+              cursos[plan.id_curso]?.nombre ||
+              cursos[plan.id_curso]?.curso ||
+              "",
+            estado: plan.estado || "esperando_aprobacion",
+            tipo_plan: plan.tipo_plan || "original",
+          }));
       } catch (error) {
         console.error(error);
         toast.error("No se pudieron cargar los planes de estudio");
@@ -1245,11 +1383,31 @@ export default {
         return acc;
       }, {});
     },
+    async cargarIdsProgramasDepartamento() {
+      if (!this.departmentId) return [];
+
+      try {
+        const response = await api.get(
+          `/departamento/${this.departmentId}/carreras`
+        );
+        return this.normalizeList(response.data).map((programa) =>
+          Number(programa.id)
+        );
+      } catch (error) {
+        console.error(error);
+        return [];
+      }
+    },
+    planPerteneceAlDepartamento(plan) {
+      if (!this.departmentId) return true;
+      return this.departamentoProgramaIds.includes(Number(plan.id_prog_form));
+    },
     estadoPlanLabel(plan) {
       const estado = plan?.estado || "esperando_aprobacion";
       const extraLabels = {
         enviado_decano: "Enviado al decano",
-        enviado_vicedecano: "Enviado al vicedecano docente",
+        enviado_vicedecano: "Enviado al vicerrector docente",
+        enviado_vicerrector: "Enviado al vicerrector docente",
         version_anterior: "Version anterior",
         modificacion_cancelada: "Modificacion cancelada",
       };
@@ -1267,6 +1425,7 @@ export default {
       const extraColors = {
         enviado_decano: "info",
         enviado_vicedecano: "info",
+        enviado_vicerrector: "info",
         version_anterior: "grey",
         modificacion_cancelada: "error",
       };
@@ -1324,6 +1483,16 @@ export default {
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
         .join("|");
+    },
+    planBloqueaCreacionInicial(plan) {
+      if (plan?.tipo_plan === "vigente") return true;
+      if (plan?.tipo_plan !== "original") return false;
+
+      return ![
+        "rechazado",
+        "modificacion_cancelada",
+        "version_anterior",
+      ].includes(plan?.estado);
     },
     puedeEnviarModificacion(plan) {
       const esPlanNuevoPendiente =
@@ -1383,10 +1552,14 @@ export default {
           ids.includes(Number(curriculo.id))
         );
 
-        if (planData.modificacion?.estructura_snapshot?.estructura) {
-          this.detalleCurriculos = this.curriculosDesdeSnapshot(
-            planData.modificacion.estructura_snapshot.estructura
-          );
+        const snapshotStructure =
+          planData.estructura_snapshot?.estructura ||
+          planData.modificacion?.estructura_snapshot?.estructura ||
+          this.estructuraDesdeSnapshotDetalle(planData.estructura_snapshot);
+
+        if (snapshotStructure) {
+          this.detalleCurriculos =
+            this.curriculosDesdeSnapshot(snapshotStructure);
         }
       } catch (error) {
         console.error(error);
@@ -1441,12 +1614,17 @@ export default {
         this.deleting = false;
       }
     },
-    abrirCrear() {
+    async abrirCrear() {
       this.dialogCrear = true;
       this.resetForm();
       this.modoFormulario = "crear";
-      this.cargarProgramasDepartamento();
-      this.cargarCursos();
+      if (!this.planes.length) {
+        await this.cargarPlanes();
+      }
+      await Promise.all([
+        this.cargarProgramasDepartamento(),
+        this.cargarCursos(),
+      ]);
     },
     async abrirModificar(plan) {
       this.dialogCrear = true;
@@ -1521,10 +1699,12 @@ export default {
           `/departamento/${this.departmentId}/carreras`
         );
         const carreras = this.normalizeList(carrerasRes.data);
-        this.programas = carreras.map((programa) => ({
-          ...programa,
-          modalidades: this.normalizeList(programa.modalidades),
-        }));
+        this.programas = this.filtrarCarrerasDisponiblesParaCrear(
+          carreras.map((programa) => ({
+            ...programa,
+            modalidades: this.normalizeList(programa.modalidades),
+          }))
+        );
       } catch (error) {
         try {
           await this.cargarProgramasDepartamentoFallback();
@@ -1551,9 +1731,26 @@ export default {
         (item) => Number(item.id_departamento) === Number(this.departmentId)
       );
       const ids = relaciones.map((item) => Number(item.id_prog_form));
-      this.programas = this.normalizeList(progRes.data).filter((item) =>
-        ids.includes(Number(item.id))
+      this.programas = this.filtrarCarrerasDisponiblesParaCrear(
+        this.normalizeList(progRes.data).filter((item) =>
+          ids.includes(Number(item.id))
+        )
       );
+    },
+    filtrarCarrerasDisponiblesParaCrear(carreras) {
+      if (this.modoFormulario !== "crear") return carreras;
+
+      const disponibles = carreras.filter(
+        (programa) =>
+          !this.programasConPlanInicialActivo.has(Number(programa.id))
+      );
+
+      if (!disponibles.length) {
+        this.formNotice =
+          "Todas las carreras de su departamento ya tienen un plan de estudio vigente o en proceso. Para esos planes solo puede crear modificaciones.";
+      }
+
+      return disponibles;
     },
     async onProgramChange() {
       this.form.id_modalidad = null;
@@ -1763,11 +1960,54 @@ export default {
                 tiene_trabajo_curso: this.toBooleanFlag(
                   asignatura.tiene_trabajo_curso
                 ),
+                id_a_academico: this.resolveAsignaturaAnioIds(asignatura),
+                anios: this.resolveAsignaturaAnios(asignatura),
               })
             ),
           })
         ),
       }));
+    },
+    resolveAsignaturaAnioIds(asignatura) {
+      const ids = this.normalizeList(asignatura.id_a_academico)
+        .map((id) => Number(id))
+        .filter(Boolean);
+      if (ids.length) return ids;
+
+      return this.resolveAsignaturaAnios(asignatura).map((anio) =>
+        Number(anio.id)
+      );
+    },
+    resolveAsignaturaAnios(asignatura) {
+      const anios = this.normalizeList(
+        asignatura.anios || asignatura.anios_academicos
+      );
+
+      return anios
+        .map((anio) => {
+          if (typeof anio === "object") {
+            const id = Number(anio.id || anio.id_a_academico);
+            if (id) {
+              return (
+                this.aniosAcademicosPrograma.find(
+                  (item) => Number(item.id) === id
+                ) || { ...anio, id }
+              );
+            }
+
+            const identificador = anio.identificador || anio.nombre;
+            return this.aniosAcademicosPrograma.find(
+              (item) => item.identificador === identificador
+            );
+          }
+
+          return this.aniosAcademicosPrograma.find(
+            (item) =>
+              Number(item.id) === Number(anio) ||
+              item.identificador === String(anio)
+          );
+        })
+        .filter(Boolean);
     },
     curriculosDesdeSnapshot(estructura) {
       return this.normalizeList(estructura).map((curriculo) => ({
@@ -1793,6 +2033,76 @@ export default {
             ),
           })
         ),
+      }));
+    },
+    estructuraDesdeSnapshotDetalle(snapshot) {
+      if (
+        !snapshot?.curriculos_detalle ||
+        !snapshot?.disciplinas_detalle ||
+        snapshot?.estructura
+      ) {
+        return null;
+      }
+
+      const curriculos = Object.entries(snapshot.curriculos_detalle).reduce(
+        (acc, [id, curriculo]) => {
+          acc[id] = {
+            id: Number(id) || id,
+            nombre: curriculo.nombre || curriculo.label || "Currículo",
+            disciplinas: {},
+          };
+          return acc;
+        },
+        {}
+      );
+
+      Object.entries(snapshot.disciplinas_detalle).forEach(
+        ([key, disciplina]) => {
+          const [curriculoId, disciplinaId] = String(key).split(":");
+          if (!curriculos[curriculoId]) return;
+
+          curriculos[curriculoId].disciplinas[disciplinaId] = {
+            id: Number(disciplinaId) || disciplinaId,
+            nombre: disciplina.nombre || disciplina.label || "Disciplina",
+            asignaturas: [],
+          };
+        }
+      );
+
+      Object.entries(snapshot.asignaturas_detalle || {}).forEach(
+        ([key, asignatura]) => {
+          const [curriculoId, disciplinaId, asignaturaId] =
+            String(key).split(":");
+          const disciplina =
+            curriculos[curriculoId]?.disciplinas?.[disciplinaId];
+          if (!disciplina) return;
+
+          disciplina.asignaturas.push({
+            id: Number(asignaturaId) || asignaturaId,
+            nombre: asignatura.nombre || "Asignatura",
+            fondo_tiempo: Number(asignatura.fondo_tiempo || 0),
+            horas_clase: Number(
+              asignatura.horas_clase || asignatura.fondo_tiempo || 0
+            ),
+            horas_practica_laboral: Number(
+              asignatura.horas_practica_laboral || 0
+            ),
+            tiene_examen_final: this.toBooleanFlag(
+              asignatura.tiene_examen_final
+            ),
+            tiene_trabajo_curso: this.toBooleanFlag(
+              asignatura.tiene_trabajo_curso
+            ),
+            anios: this.normalizeList(asignatura.anios).map((anio) =>
+              typeof anio === "object" ? anio : { identificador: anio }
+            ),
+          });
+        }
+      );
+
+      return Object.values(curriculos).map((curriculo) => ({
+        ...curriculo,
+        disciplinas: Object.values(curriculo.disciplinas),
       }));
     },
     asignaturaTotalHoras(asignatura) {
@@ -1855,6 +2165,47 @@ export default {
 
       this.cerrarNuevaDisciplina();
     },
+    abrirEditarCurriculo(curriculo) {
+      this.estructuraEditando = {
+        tipo: "curriculo",
+        item: curriculo,
+        nombre: curriculo?.nombre || "",
+        error: "",
+      };
+      this.dialogEditarEstructura = true;
+    },
+    abrirEditarDisciplina(disciplina) {
+      this.estructuraEditando = {
+        tipo: "disciplina",
+        item: disciplina,
+        nombre: disciplina?.nombre || "",
+        error: "",
+      };
+      this.dialogEditarEstructura = true;
+    },
+    cerrarEditarEstructura() {
+      this.dialogEditarEstructura = false;
+      this.estructuraEditando = {
+        tipo: "",
+        item: null,
+        nombre: "",
+        error: "",
+      };
+    },
+    guardarEdicionEstructura() {
+      const nombre = String(this.estructuraEditando.nombre || "").trim();
+
+      if (!nombre) {
+        this.estructuraEditando.error = "Escriba un nombre.";
+        return;
+      }
+
+      if (this.estructuraEditando.item) {
+        this.estructuraEditando.item.nombre = nombre;
+      }
+
+      this.cerrarEditarEstructura();
+    },
     agregarAsignatura(disciplina) {
       disciplina.asignaturas.push({
         id: `new-asig-${Date.now()}`,
@@ -1873,6 +2224,45 @@ export default {
       disciplina.asignaturas = this.normalizeList(
         disciplina.asignaturas
       ).filter((item) => item.id !== asignatura.id);
+    },
+    abrirEliminarDisciplina(curriculo, disciplina) {
+      this.eliminacionPendiente = {
+        tipo: "disciplina",
+        item: disciplina,
+        parent: curriculo,
+      };
+      this.dialogConfirmarEstructura = true;
+    },
+    abrirEliminarAsignatura(disciplina, asignatura) {
+      this.eliminacionPendiente = {
+        tipo: "asignatura",
+        item: asignatura,
+        parent: disciplina,
+      };
+      this.dialogConfirmarEstructura = true;
+    },
+    cerrarConfirmarEstructura() {
+      this.dialogConfirmarEstructura = false;
+      this.eliminacionPendiente = {
+        tipo: "",
+        item: null,
+        parent: null,
+      };
+    },
+    confirmarEliminacionEstructura() {
+      const { tipo, item, parent } = this.eliminacionPendiente;
+
+      if (tipo === "disciplina" && parent) {
+        parent.disciplinas = this.normalizeList(parent.disciplinas).filter(
+          (disciplina) => disciplina.id !== item?.id
+        );
+      }
+
+      if (tipo === "asignatura" && parent) {
+        this.quitarAsignatura(parent, item);
+      }
+
+      this.cerrarConfirmarEstructura();
     },
     onAsignaturaExistenteChange(asignatura) {
       const seleccionada = this.asignaturasDisponibles.find(
@@ -1931,13 +2321,24 @@ export default {
       if (this.modoFormulario !== "modificar") return true;
 
       for (const curriculo of this.curriculosSeleccionados) {
+        if (!String(curriculo.nombre || "").trim()) {
+          this.formError = "Escriba el nombre del currículo.";
+          return false;
+        }
+
         for (const disciplina of curriculo.disciplinas) {
-          if (disciplina.is_new && !String(disciplina.nombre || "").trim()) {
-            this.formError = "Escriba el nombre de la nueva disciplina.";
+          if (!String(disciplina.nombre || "").trim()) {
+            this.formError = "Escriba el nombre de la disciplina.";
             return false;
           }
 
           for (const asignatura of disciplina.asignaturas) {
+            if (!this.normalizeList(asignatura.id_a_academico).length) {
+              this.formError =
+                "Seleccione al menos un año académico para cada asignatura.";
+              return false;
+            }
+
             if (!asignatura.is_new) continue;
 
             const tieneExistente = !!asignatura.id_asignatura_existente;
@@ -1946,12 +2347,6 @@ export default {
             if (!tieneExistente && !tieneNueva) {
               this.formError =
                 "Seleccione una asignatura existente o escriba una nueva.";
-              return false;
-            }
-
-            if (!this.normalizeList(asignatura.id_a_academico).length) {
-              this.formError =
-                "Seleccione al menos un año académico para la asignatura agregada.";
               return false;
             }
           }
@@ -2455,6 +2850,31 @@ export default {
   gap: 14px;
 }
 
+.wizard-card {
+  max-height: 92vh;
+  overflow: hidden;
+}
+
+.wizard-card-structure {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wizard-card-structure .wizard-header,
+.wizard-card-structure .step-strip,
+.wizard-card-structure .wizard-body,
+.wizard-card-structure .v-card-actions {
+  min-width: 1180px;
+}
+
+.wizard-body {
+  max-height: calc(92vh - 178px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px !important;
+}
+
 .grid-full {
   grid-column: 1 / -1;
 }
@@ -2573,6 +2993,7 @@ export default {
 .asignatura-list {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .asignatura-row {
@@ -2584,6 +3005,7 @@ export default {
   border: 1px solid #eef2f7;
   border-radius: 8px;
   background: #fbfdff;
+  min-width: 0;
 }
 
 .asignatura-row-editing {
@@ -2602,13 +3024,14 @@ export default {
   display: grid !important;
   width: 100%;
   grid-template-columns:
-    minmax(180px, 1fr)
-    minmax(180px, 1fr)
+    minmax(210px, 1fr)
+    minmax(190px, 1fr)
     100px
     100px
     140px
     130px
-    minmax(170px, 0.8fr);
+    minmax(220px, 0.9fr)
+    44px;
   gap: 10px;
 }
 
@@ -2762,6 +3185,7 @@ export default {
   }
 
   .asignatura-edit-grid {
+    width: 100%;
     grid-template-columns: 1fr;
   }
 

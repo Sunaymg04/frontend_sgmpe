@@ -39,6 +39,12 @@ const routes = [
     component: PlanEstudioListView,
   },
   {
+    path: "/planes_vigentes",
+    name: "planes_vigentes",
+    component: PlanEstudioListView,
+    meta: { soloVigentes: true },
+  },
+  {
     path: "/plan_estudio/:id/excel",
     name: "plan_estudio_excel",
     component: PlanEstudioExcelView,
@@ -55,16 +61,16 @@ const routes = [
     meta: { historial: true },
   },
   {
-    path: "/vicedecano/solicitudes",
-    name: "vicedecano_solicitudes",
+    path: "/vicerrector/solicitudes",
+    name: "vicerrector_solicitudes",
     component: SolicitudesModificacionView,
-    meta: { reviewerRole: "vicedecano_docente" },
+    meta: { reviewerRole: "vicerrector_docente" },
   },
   {
-    path: "/vicedecano/historial",
-    name: "vicedecano_historial",
+    path: "/vicerrector/historial",
+    name: "vicerrector_historial",
     component: SolicitudesModificacionView,
-    meta: { historial: true, reviewerRole: "vicedecano_docente" },
+    meta: { historial: true, reviewerRole: "vicerrector_docente" },
   },
 
   {
@@ -110,10 +116,10 @@ router.beforeEach((to) => {
   }
   if (
     isAuthed &&
-    store.getters.primaryRole === "vicedecano_docente" &&
+    store.getters.primaryRole === "vicerrector_docente" &&
     to.name === "dashboard"
   ) {
-    return { name: "vicedecano_solicitudes" };
+    return { name: "vicerrector_solicitudes" };
   }
   return true;
 });

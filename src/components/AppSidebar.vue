@@ -81,27 +81,43 @@ export default {
           to: "/decano/historial",
         },
       ],
-      viceDeanItems: [
+      viceRectorItems: [
         {
           title: "Revisión Académica",
           icon: "mdi-clipboard-check-outline",
-          to: "/vicedecano/solicitudes",
+          to: "/vicerrector/solicitudes",
         },
         {
           title: "Historial",
           icon: "mdi-history",
-          to: "/vicedecano/historial",
+          to: "/vicerrector/historial",
         },
       ],
     };
   },
 
   computed: {
+    planesVigentesItem() {
+      return {
+        title: "Planes vigentes",
+        icon: "mdi-file-check-outline",
+        to: "/planes_vigentes",
+      };
+    },
     items() {
       const role = this.$store.getters.primaryRole;
-      if (role === "decano") return this.deanItems;
-      if (role === "vicedecano_docente") return this.viceDeanItems;
-      return this.defaultItems;
+      const roleItems =
+        role === "decano"
+          ? this.deanItems
+          : role === "vicerrector_docente"
+          ? this.viceRectorItems
+          : this.defaultItems;
+
+      if (roleItems.some((item) => item.to === this.planesVigentesItem.to)) {
+        return roleItems;
+      }
+
+      return [...roleItems, this.planesVigentesItem];
     },
     drawer: {
       get() {
