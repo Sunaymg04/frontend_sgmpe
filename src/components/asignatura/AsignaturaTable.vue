@@ -87,10 +87,13 @@ export default {
     asignaturasFiltradas() {
       if (!this.search) return this.asignaturas;
 
-      return this.asignaturas.filter(
-        (a) =>
-          a.nombre.toLowerCase().includes(this.search.toLowerCase()) ||
-          String(a.id).includes(this.search)
+      const needle = this.search.toLowerCase();
+
+      return this.asignaturas.filter((a) =>
+        [a.nombre, a.id, ...this.normalizeList(a.programa)]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle)
       );
     },
   },

@@ -65,7 +65,7 @@
             variant="outlined"
             density="comfortable"
             hide-details
-            class="mb-4"
+            class="history-search mb-4"
           />
 
           <v-alert
@@ -77,18 +77,17 @@
             No hay planes en el historial para esa carrera.
           </v-alert>
 
-          <v-expansion-panels
-            v-else
-            variant="accordion"
-            multiple
-            class="career-history"
-          >
-            <v-expansion-panel
+          <div v-else class="career-history">
+            <article
               v-for="grupo in historialAgrupadoPorCarrera"
               :key="grupo.nombre"
               class="career-panel"
             >
-              <v-expansion-panel-title>
+              <button
+                type="button"
+                class="career-panel-toggle"
+                @click="toggleCareerHistory(grupo.nombre)"
+              >
                 <div class="career-panel-title">
                   <div>
                     <strong>{{ grupo.nombre }}</strong>
@@ -97,9 +96,19 @@
                   <v-chip color="primary" variant="tonal" size="small">
                     {{ grupo.planes.length }}
                   </v-chip>
+                  <v-icon>
+                    {{
+                      isCareerHistoryOpen(grupo.nombre)
+                        ? "mdi-chevron-up"
+                        : "mdi-chevron-down"
+                    }}
+                  </v-icon>
                 </div>
-              </v-expansion-panel-title>
-              <v-expansion-panel-text>
+              </button>
+              <div
+                v-show="isCareerHistoryOpen(grupo.nombre)"
+                class="career-panel-body"
+              >
                 <div class="request-list">
                   <v-card
                     v-for="plan in grupo.planes"
@@ -358,9 +367,9 @@
                     </div>
                   </v-card>
                 </div>
-              </v-expansion-panel-text>
-            </v-expansion-panel>
-          </v-expansion-panels>
+              </div>
+            </article>
+          </div>
         </template>
 
         <div v-else class="request-list">
@@ -622,6 +631,7 @@ export default {
       accionLoading: "",
       solicitudes: [],
       historialSearch: "",
+      careerHistoryOpen: [],
       detalleAbiertoId: null,
       detalleLoading: null,
       detalleError: "",
@@ -750,12 +760,36 @@ export default {
           params,
         });
         this.solicitudes = Array.isArray(res.data?.data) ? res.data.data : [];
+        this.sincronizarHistorialCarrerasAbiertas();
       } catch (error) {
         console.error(error);
         toast.error("No se pudieron cargar las solicitudes");
       } finally {
         this.loading = false;
       }
+    },
+    sincronizarHistorialCarrerasAbiertas() {
+      if (!this.mostrarHistorialAgrupado) return;
+
+      const actuales = new Set(this.careerHistoryOpen);
+      const nombres = this.historialAgrupadoPorCarrera.map(
+        (grupo) => grupo.nombre
+      );
+
+      this.careerHistoryOpen = nombres.filter((nombre) => actuales.has(nombre));
+    },
+    isCareerHistoryOpen(nombre) {
+      return this.careerHistoryOpen.includes(nombre);
+    },
+    toggleCareerHistory(nombre) {
+      if (this.isCareerHistoryOpen(nombre)) {
+        this.careerHistoryOpen = this.careerHistoryOpen.filter(
+          (item) => item !== nombre
+        );
+        return;
+      }
+
+      this.careerHistoryOpen = [...this.careerHistoryOpen, nombre];
     },
     planEsNuevo(plan) {
       return plan?.tipo_plan === "original";
@@ -1138,6 +1172,14 @@ export default {
   border-radius: 8px;
 }
 
+.review-card {
+  width: 100%;
+}
+
+.history-search {
+  width: min(540px, 100%);
+}
+
 .loading-state {
   display: flex;
   align-items: center;
@@ -1148,23 +1190,48 @@ export default {
 
 .request-list {
   display: grid;
+  grid-template-columns: 1fr;
   gap: 14px;
 }
 
 .career-history {
   display: grid;
   gap: 12px;
+  width: 100%;
 }
 
 .career-panel {
+  width: 100%;
+  overflow: hidden;
   border: 1px solid #dbe3ef;
   border-radius: 8px !important;
+  background: #ffffff;
+}
+
+.career-panel-toggle {
+  display: block;
+  width: 100%;
+  padding: 16px 22px;
+  border: 0;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.career-panel-toggle:hover {
+  background: #f8fafc;
+}
+
+.career-panel-body {
+  width: 100%;
+  padding: 0 22px 22px;
+  border-top: 1px solid #e2e8f0;
 }
 
 .career-panel-title {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 28px;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   width: 100%;
 }
@@ -1172,6 +1239,11 @@ export default {
 .career-panel-title > div {
   display: grid;
   gap: 2px;
+  min-width: 0;
+}
+
+.career-panel-title .v-chip {
+  justify-self: center;
 }
 
 .career-panel-title small {
@@ -1180,6 +1252,7 @@ export default {
 }
 
 .request-item {
+  width: 100%;
   padding: 18px;
 }
 

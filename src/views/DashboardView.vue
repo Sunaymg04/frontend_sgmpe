@@ -44,6 +44,12 @@ export default {
           to: "/plan_estudio",
         },
         {
+          title: "Planes vigentes",
+          text: "Consultar los planes de estudio aprobados y vigentes.",
+          icon: "mdi-file-check-outline",
+          to: "/planes_vigentes",
+        },
+        {
           title: "Estructura Curricular",
           text: "Administrar asignaturas, disciplinas y currículos.",
           icon: "mdi-shape-outline",

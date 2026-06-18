@@ -20,19 +20,42 @@
         </v-chip>
       </template>
 
-      <template v-slot:[`item.acciones`]="{ item }">
-        <v-btn
-          icon
-          color="primary"
-          variant="text"
-          @click="$emit('editar', item)"
+      <template v-slot:[`item.programas`]="{ item }">
+        <v-chip
+          v-for="programa in item.nombresProgramas"
+          :key="programa"
+          class="ma-1"
+          color="secondary"
+          size="small"
+          variant="tonal"
         >
-          <v-icon>mdi-pencil</v-icon>
-        </v-btn>
+          {{ programa }}
+        </v-chip>
+        <span v-if="!item.nombresProgramas.length" class="empty-text">
+          Sin programa
+        </span>
+      </template>
 
-        <v-btn icon color="red" variant="text" @click="$emit('eliminar', item)">
-          <v-icon>mdi-delete</v-icon>
-        </v-btn>
+      <template v-slot:[`item.acciones`]="{ item }">
+        <div class="actions-cell">
+          <v-btn
+            icon
+            color="primary"
+            variant="text"
+            @click="$emit('editar', item)"
+          >
+            <v-icon>mdi-pencil</v-icon>
+          </v-btn>
+
+          <v-btn
+            icon
+            color="red"
+            variant="text"
+            @click="$emit('eliminar', item)"
+          >
+            <v-icon>mdi-delete</v-icon>
+          </v-btn>
+        </div>
       </template>
 
       <template v-slot:expanded-row="{ columns, item }">
@@ -90,8 +113,9 @@ export default {
         { title: "Código", key: "id" },
         { title: "Nombre de la disciplina", key: "nombre" },
         { title: "Fondo de Tiempo", key: "fondo_tiempo" },
+        { title: "Programa de formacion", key: "programas" },
         { title: "Currículos", key: "curriculos" },
-        { title: "Acciones", key: "acciones", sortable: false },
+        { title: "Acciones", key: "acciones", sortable: false, width: 132 },
       ],
     };
   },
@@ -100,10 +124,13 @@ export default {
     disciplinasFiltradas() {
       if (!this.search) return this.disciplinas;
 
-      return this.disciplinas.filter(
-        (d) =>
-          d.nombre.toLowerCase().includes(this.search.toLowerCase()) ||
-          String(d.id).includes(this.search)
+      const needle = this.search.toLowerCase();
+
+      return this.disciplinas.filter((d) =>
+        [d.nombre, d.id, ...this.normalizeList(d.nombresProgramas)]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle)
       );
     },
   },
@@ -117,17 +144,28 @@ export default {
       try {
         this.loading = true;
         this.contextoDepartamento = await this.cargarContextoDepartamento();
-        const [resDis, resCur, resRel] = await Promise.all([
+        const [resDis, resCur, resRel, resProg, resAsig] = await Promise.all([
           api.get("/disciplina"),
           api.get("/curriculo"),
           api.get("/curriculo_disciplina"),
+          api.get("/progForm").catch(() => ({ data: [] })),
+          api.get("/asignatura").catch(() => ({ data: [] })),
         ]);
         const disciplinas = resDis.data.data;
         const curriculos = resCur.data.data;
         const relaciones = resRel.data.data;
+        const programas = this.normalizeList(resProg.data);
+        const asignaturas = this.normalizeList(resAsig.data);
         const mapaCurriculos = {};
+        const mapaProgramas = {};
+        const programasPorDisciplina =
+          this.programasPorDisciplinaDesdeAsignaturas(asignaturas);
+
         curriculos.forEach((c) => {
           mapaCurriculos[c.id] = c.nombre;
+        });
+        programas.forEach((programa) => {
+          mapaProgramas[programa.id] = programa.nombre;
         });
 
         this.disciplinas = disciplinas
@@ -138,16 +176,35 @@ export default {
           )
           .map((d) => {
             const rel = relaciones.filter((r) => {
-              if (r.id_disciplina !== d.id) return false;
+              if (Number(r.id_disciplina) !== Number(d.id)) return false;
               if (!this.contextoDepartamento) return true;
-              return this.contextoDepartamento.curriculoIds.has(
-                Number(r.id_curriculo)
+
+              const programaRelacion = Number(r.id_prog_form || 0);
+              return (
+                this.contextoDepartamento.curriculoIds.has(
+                  Number(r.id_curriculo)
+                ) &&
+                (!programaRelacion ||
+                  this.contextoDepartamento.programaIds.includes(
+                    programaRelacion
+                  ))
               );
             });
 
             const nombresCurriculos = rel.map(
               (r) => mapaCurriculos[r.id_curriculo]
             );
+            const nombresProgramas = [
+              ...new Set(
+                [
+                  ...rel.map((r) => mapaProgramas[r.id_prog_form]),
+                  ...(this.contextoDepartamento?.disciplinaProgramas.get(
+                    Number(d.id)
+                  ) || []),
+                  ...(programasPorDisciplina.get(Number(d.id)) || []),
+                ].filter(Boolean)
+              ),
+            ];
 
             return {
               ...d,
@@ -159,6 +216,7 @@ export default {
                   )
                 : d.asignaturas,
               nombresCurriculos,
+              nombresProgramas,
             };
           });
       } catch (error) {
@@ -173,6 +231,37 @@ export default {
         (item) => item?.active && item?.role === "jefe_departamento"
       );
       return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
+    },
+    programasPorDisciplinaDesdeAsignaturas(asignaturas) {
+      const mapa = new Map();
+
+      asignaturas.forEach((asignatura) => {
+        const programasAsignatura = this.normalizeList(
+          asignatura.anios_academicos
+        )
+          .filter(
+            (anio) =>
+              !this.contextoDepartamento ||
+              this.contextoDepartamento.programaIds.includes(
+                Number(anio.id_prog_form)
+              )
+          )
+          .map((anio) => anio.programa_formacion?.nombre)
+          .filter(Boolean);
+
+        if (!programasAsignatura.length) return;
+
+        this.normalizeList(asignatura.disciplinas).forEach((disciplina) => {
+          const disciplinaId = Number(disciplina.id);
+          const existentes = mapa.get(disciplinaId) || [];
+
+          mapa.set(disciplinaId, [
+            ...new Set([...existentes, ...programasAsignatura]),
+          ]);
+        });
+      });
+
+      return mapa;
     },
     async cargarContextoDepartamento() {
       const departmentId = this.getDepartmentId();
@@ -194,12 +283,31 @@ export default {
       const curriculoIds = new Set();
       const disciplinaIds = new Set();
       const asignaturaIds = new Set();
+      const disciplinaProgramas = new Map();
+      const programaNombres = this.normalizeList(carrerasRes.data).reduce(
+        (acc, programa) => {
+          acc[Number(programa.id)] = programa.nombre;
+          return acc;
+        },
+        {}
+      );
 
-      estructuras.forEach((response) => {
+      estructuras.forEach((response, index) => {
+        const programaId = programaIds[index];
+        const programaNombre = programaNombres[programaId];
         this.normalizeList(response.data).forEach((curriculo) => {
           curriculoIds.add(Number(curriculo.id));
           this.normalizeList(curriculo.disciplinas).forEach((disciplina) => {
-            disciplinaIds.add(Number(disciplina.id));
+            const disciplinaId = Number(disciplina.id);
+            disciplinaIds.add(disciplinaId);
+
+            if (programaNombre) {
+              const nombres = disciplinaProgramas.get(disciplinaId) || [];
+              disciplinaProgramas.set(disciplinaId, [
+                ...new Set([...nombres, programaNombre]),
+              ]);
+            }
+
             this.normalizeList(disciplina.asignaturas).forEach((asignatura) => {
               asignaturaIds.add(Number(asignatura.id));
             });
@@ -207,7 +315,13 @@ export default {
         });
       });
 
-      return { programaIds, curriculoIds, disciplinaIds, asignaturaIds };
+      return {
+        programaIds,
+        curriculoIds,
+        disciplinaIds,
+        asignaturaIds,
+        disciplinaProgramas,
+      };
     },
   },
   mounted() {
@@ -217,9 +331,29 @@ export default {
 </script>
 <style scoped>
 .modern-table {
+  max-width: 100%;
+  overflow-x: auto;
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
+
+.modern-table :deep(.v-data-table) {
+  min-width: 980px;
+}
+
+.actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 96px;
+  white-space: nowrap;
+}
+
+.actions-cell .v-btn {
+  flex: 0 0 auto;
+}
+
 .modern-table :deep(th) {
   font-weight: 700;
   color: #0f172a;
@@ -272,5 +406,16 @@ export default {
 
 .asignatura-card small {
   color: #64748b;
+}
+
+.empty-text {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 980px) {
+  .modern-table {
+    border-radius: 8px;
+  }
 }
 </style>

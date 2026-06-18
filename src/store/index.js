@@ -9,6 +9,13 @@ const VALID_ROLES = [
   "rector",
   "vicerrector_docente",
 ];
+const ROLE_PRIORITY = [
+  "admin",
+  "vicerrector_docente",
+  "rector",
+  "decano",
+  "jefe_departamento",
+];
 const ACTIVITY_MAX = 30;
 
 function clearPersistedAuth() {
@@ -40,7 +47,10 @@ export default createStore({
     },
     primaryRole(state) {
       const access = state.auth?.access ?? [];
-      const active = access.find((a) => a?.active);
+      const active =
+        ROLE_PRIORITY.map((role) =>
+          access.find((item) => item?.active && item?.role === role)
+        ).find(Boolean) || access.find((a) => a?.active);
       return active?.role ?? "";
     },
     recentActivity(state) {

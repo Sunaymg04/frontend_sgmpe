@@ -126,7 +126,7 @@
           <v-chip class="user-role-chip" size="x-small" variant="flat">
             {{ role }}
           </v-chip>
-          <span v-if="department" class="user-department">
+          <span v-if="showDepartment" class="user-department">
             {{ department }}
           </span>
         </div>
@@ -180,6 +180,14 @@ export default {
         .map((part) => part.charAt(0).toUpperCase())
         .join("")
         .slice(0, 2);
+    },
+    showDepartment() {
+      return (
+        Boolean(this.department) &&
+        String(this.role || "")
+          .trim()
+          .toLowerCase() !== "vicerrector docente"
+      );
     },
   },
   methods: {

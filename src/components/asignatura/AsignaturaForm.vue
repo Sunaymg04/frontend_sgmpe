@@ -25,6 +25,22 @@
             class="mb-4"
           />
 
+          <v-select
+            v-if="departmentId"
+            v-model="form.id_prog_form"
+            :items="programas"
+            item-title="nombre"
+            item-value="id"
+            label="Programa de formación"
+            variant="outlined"
+            rounded="lg"
+            prepend-inner-icon="mdi-account-school-outline"
+            class="mb-4"
+            :loading="loadingProgramas"
+            :disabled="loadingProgramas || programas.length <= 1"
+            @update:model-value="cambiarPrograma"
+          />
+
           <!-- Cantidad de horas -->
           <v-row>
             <v-col cols="12" md="4">
@@ -69,20 +85,24 @@
           <v-row>
             <v-col cols="12" md="6">
               <v-switch
-                v-model="form.tiene_examen_final"
+                v-model="examenFinalModel"
                 color="primary"
                 label="Tiene examen final"
                 hide-details
                 inset
+                :true-value="true"
+                :false-value="false"
               />
             </v-col>
             <v-col cols="12" md="6">
               <v-switch
-                v-model="form.tiene_trabajo_curso"
+                v-model="trabajoCursoModel"
                 color="primary"
                 label="Tiene trabajo de curso"
                 hide-details
                 inset
+                :true-value="true"
+                :false-value="false"
               />
             </v-col>
           </v-row>
@@ -150,7 +170,9 @@ export default {
       disciplinas: [],
 
       aniosAcademicos: [],
+      programas: [],
       loadingAnios: false,
+      loadingProgramas: false,
 
       form: {
         id: null,
@@ -162,6 +184,7 @@ export default {
         tiene_trabajo_curso: false,
         id_disciplina: [],
         id_a_academico: [],
+        id_prog_form: null,
       },
     };
   },
@@ -191,6 +214,22 @@ export default {
         Number(this.form.horas_practica_laboral || 0)
       );
     },
+    examenFinalModel: {
+      get() {
+        return this.toBooleanFlag(this.form.tiene_examen_final);
+      },
+      set(value) {
+        this.setExamenFinal(value);
+      },
+    },
+    trabajoCursoModel: {
+      get() {
+        return this.toBooleanFlag(this.form.tiene_trabajo_curso);
+      },
+      set(value) {
+        this.setTrabajoCurso(value);
+      },
+    },
   },
   watch: {
     asignatura: {
@@ -198,6 +237,8 @@ export default {
 
       handler(valor) {
         if (valor) {
+          const tieneExamenFinal = this.toBooleanFlag(valor.tiene_examen_final);
+
           this.form = {
             id: valor.id,
 
@@ -209,8 +250,10 @@ export default {
                 ? Number(valor.horas_clase || 0)
                 : Number(valor.fondo_tiempo || 0),
             horas_practica_laboral: Number(valor.horas_practica_laboral || 0),
-            tiene_examen_final: this.toBooleanFlag(valor.tiene_examen_final),
-            tiene_trabajo_curso: this.toBooleanFlag(valor.tiene_trabajo_curso),
+            tiene_examen_final: tieneExamenFinal,
+            tiene_trabajo_curso:
+              !tieneExamenFinal &&
+              this.toBooleanFlag(valor.tiene_trabajo_curso),
 
             // disciplinas
 
@@ -223,21 +266,99 @@ export default {
             id_a_academico: Array.isArray(valor.anios_academicos)
               ? valor.anios_academicos.map((a) => Number(a.id))
               : [],
+
+            id_prog_form: Array.isArray(valor.anios_academicos)
+              ? valor.anios_academicos.find((a) => a?.id_prog_form)
+                  ?.id_prog_form ?? null
+              : null,
           };
         }
       },
+    },
+    "form.tiene_examen_final"(value) {
+      if (this.toBooleanFlag(value) && this.form.tiene_trabajo_curso) {
+        this.form.tiene_trabajo_curso = false;
+      }
+    },
+    "form.tiene_trabajo_curso"(value) {
+      if (this.toBooleanFlag(value) && this.form.tiene_examen_final) {
+        this.form.tiene_examen_final = false;
+      }
     },
   },
 
   methods: {
     async obtenerDisciplinas() {
       try {
+        if (this.departmentId) {
+          const programaIds = this.form.id_prog_form
+            ? [Number(this.form.id_prog_form)]
+            : this.programas.map((programa) => Number(programa.id));
+
+          if (programaIds.length) {
+            const estructuras = await Promise.all(
+              programaIds.map((id) =>
+                api.get(`/progForm/${id}/estructura-curricular`).catch(() => ({
+                  data: [],
+                }))
+              )
+            );
+
+            this.disciplinas =
+              this.extraerDisciplinasDeEstructuras(estructuras);
+            return;
+          }
+        }
+
         const res = await api.get("/disciplina");
 
         this.disciplinas = res.data.data;
       } catch (error) {
         console.error(error);
       }
+    },
+    extraerDisciplinasDeEstructuras(estructuras) {
+      const mapa = new Map();
+
+      estructuras.forEach((response) => {
+        this.normalizeList(response.data).forEach((curriculo) => {
+          this.normalizeList(curriculo.disciplinas).forEach((disciplina) => {
+            mapa.set(Number(disciplina.id), {
+              ...disciplina,
+              nombre: `${disciplina.nombre} (${curriculo.nombre})`,
+            });
+          });
+        });
+      });
+
+      return Array.from(mapa.values());
+    },
+    async obtenerProgramasDepartamento() {
+      if (!this.departmentId) return;
+
+      this.loadingProgramas = true;
+      try {
+        const res = await api.get(
+          `/departamento/${this.departmentId}/carreras`
+        );
+        this.programas = this.normalizeList(res.data);
+
+        if (!this.form.id_prog_form && this.programas.length === 1) {
+          this.form.id_prog_form = Number(this.programas[0].id);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loadingProgramas = false;
+      }
+    },
+    async cambiarPrograma() {
+      this.form.id_disciplina = [];
+      this.form.id_a_academico = [];
+      await Promise.all([
+        this.obtenerDisciplinas(),
+        this.obtenerAniosAcademicos(),
+      ]);
     },
 
     async obtenerAniosAcademicos() {
@@ -253,12 +374,16 @@ export default {
           api.get("/a_academico"),
         ]);
 
-        const carreras = this.normalizeList(carrerasRes.data);
+        const carreras = this.programas.length
+          ? this.programas
+          : this.normalizeList(carrerasRes.data);
         const programasPorId = carreras.reduce((acc, carrera) => {
           acc[Number(carrera.id)] = carrera.nombre;
           return acc;
         }, {});
-        const idsProgramas = Object.keys(programasPorId).map(Number);
+        const idsProgramas = this.form.id_prog_form
+          ? [Number(this.form.id_prog_form)]
+          : Object.keys(programasPorId).map(Number);
 
         this.aniosAcademicos = this.normalizeList(aniosRes.data)
           .filter((anio) => idsProgramas.includes(Number(anio.id_prog_form)))
@@ -293,6 +418,24 @@ export default {
     },
     toBooleanFlag(value) {
       return value === true || value === 1 || value === "1";
+    },
+    setExamenFinal(value) {
+      const activo = this.toBooleanFlag(value);
+
+      this.form.tiene_examen_final = activo;
+
+      if (activo) {
+        this.form.tiene_trabajo_curso = false;
+      }
+    },
+    setTrabajoCurso(value) {
+      const activo = this.toBooleanFlag(value);
+
+      this.form.tiene_trabajo_curso = activo;
+
+      if (activo) {
+        this.form.tiene_examen_final = false;
+      }
     },
 
     async guardar() {
@@ -342,25 +485,32 @@ export default {
         tiene_trabajo_curso: false,
         id_disciplina: [],
         id_a_academico: [],
+        id_prog_form:
+          this.programas.length === 1 ? Number(this.programas[0].id) : null,
       };
       this.$emit("cerrado");
     },
     asignaturaPayload() {
+      const tieneExamenFinal = this.toBooleanFlag(this.form.tiene_examen_final);
+      const tieneTrabajoCurso =
+        !tieneExamenFinal && this.toBooleanFlag(this.form.tiene_trabajo_curso);
+
       return {
         ...this.form,
         fondo_tiempo: this.fondoTiempoTotal,
         horas_clase: Number(this.form.horas_clase || 0),
         horas_practica_laboral: Number(this.form.horas_practica_laboral || 0),
-        tiene_examen_final: this.toBooleanFlag(this.form.tiene_examen_final),
-        tiene_trabajo_curso: this.toBooleanFlag(this.form.tiene_trabajo_curso),
+        tiene_examen_final: tieneExamenFinal,
+        tiene_trabajo_curso: tieneTrabajoCurso,
       };
     },
   },
 
   mounted() {
-    this.obtenerDisciplinas();
-
-    this.obtenerAniosAcademicos();
+    this.obtenerProgramasDepartamento().then(() => {
+      this.obtenerDisciplinas();
+      this.obtenerAniosAcademicos();
+    });
   },
 };
 </script>

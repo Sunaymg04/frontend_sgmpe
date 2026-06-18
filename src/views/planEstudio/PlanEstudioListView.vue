@@ -82,7 +82,7 @@
               <v-icon>mdi-eye-outline</v-icon>
             </v-btn>
             <v-btn
-              v-if="!soloVigentes"
+              v-if="puedeModificarPlan(item)"
               icon
               variant="text"
               color="secondary"
@@ -408,6 +408,7 @@
                         :class="{
                           'asignatura-row-editing':
                             modoFormulario === 'modificar',
+                          'asignatura-row-new': asignatura.is_new,
                         }"
                       >
                         <div v-if="modoFormulario !== 'modificar'">
@@ -476,6 +477,25 @@
                             density="compact"
                             hide-details
                             inset
+                            @update:model-value="
+                              (value) =>
+                                onAsignaturaExamenFinalChange(asignatura, value)
+                            "
+                          />
+                          <v-switch
+                            v-model="asignatura.tiene_trabajo_curso"
+                            color="primary"
+                            label="Trabajo curso"
+                            density="compact"
+                            hide-details
+                            inset
+                            @update:model-value="
+                              (value) =>
+                                onAsignaturaTrabajoCursoChange(
+                                  asignatura,
+                                  value
+                                )
+                            "
                           />
                           <v-select
                             v-model="asignatura.id_a_academico"
@@ -1019,6 +1039,7 @@ export default {
       loading: false,
       planes: [],
       departamentoProgramaIds: [],
+      facultadProgramaIds: [],
       programas: [],
       modalidades: [],
       calificaciones: [],
@@ -1094,6 +1115,12 @@ export default {
         (item) => item?.active && item?.role === "jefe_departamento"
       );
       return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
+    },
+    facultyId() {
+      const decano = this.authAccess.find(
+        (item) => item?.active && item?.role === "decano"
+      );
+      return decano?.facultad_id ?? decano?.id_facultad ?? null;
     },
     soloVigentes() {
       return Boolean(this.$route?.meta?.soloVigentes);
@@ -1348,9 +1375,10 @@ export default {
         const cursos = this.toMap(this.normalizeList(cursoRes.data));
         this.departamentoProgramaIds =
           await this.cargarIdsProgramasDepartamento();
+        this.facultadProgramaIds = await this.cargarIdsProgramasFacultad();
 
         this.planes = this.normalizeList(planRes.data)
-          .filter((plan) => this.planPerteneceAlDepartamento(plan))
+          .filter((plan) => this.planPerteneceAlContexto(plan))
           .map((plan) => ({
             ...plan,
             programa_nombre:
@@ -1401,6 +1429,46 @@ export default {
     planPerteneceAlDepartamento(plan) {
       if (!this.departmentId) return true;
       return this.departamentoProgramaIds.includes(Number(plan.id_prog_form));
+    },
+    async cargarIdsProgramasFacultad() {
+      if (!this.soloVigentes || !this.facultyId) return [];
+
+      try {
+        const departamentosRes = await api.get(
+          `/facultad/${this.facultyId}/departamentos`
+        );
+        const departamentos = this.normalizeList(departamentosRes.data);
+        const carrerasResponses = await Promise.all(
+          departamentos.map((departamento) =>
+            api
+              .get(`/departamento/${departamento.id}/carreras`)
+              .catch(() => ({ data: [] }))
+          )
+        );
+
+        return [
+          ...new Set(
+            carrerasResponses.flatMap((response) =>
+              this.normalizeList(response.data).map((programa) =>
+                Number(programa.id)
+              )
+            )
+          ),
+        ];
+      } catch (error) {
+        console.error(error);
+        return [];
+      }
+    },
+    planPerteneceALaFacultad(plan) {
+      if (!this.soloVigentes || !this.facultyId) return true;
+      return this.facultadProgramaIds.includes(Number(plan.id_prog_form));
+    },
+    planPerteneceAlContexto(plan) {
+      return (
+        this.planPerteneceAlDepartamento(plan) &&
+        this.planPerteneceALaFacultad(plan)
+      );
     },
     estadoPlanLabel(plan) {
       const estado = plan?.estado || "esperando_aprobacion";
@@ -1503,6 +1571,9 @@ export default {
         plan?.estado === "modificado_esperando_aprobacion";
 
       return esPlanNuevoPendiente || esModificacionPendiente;
+    },
+    puedeModificarPlan(plan) {
+      return plan?.estado === "vigente";
     },
     async enviarModificacion(plan) {
       this.sendingPlanId = plan.id;
@@ -1655,10 +1726,19 @@ export default {
           this.cargarCatalogosEstructura(),
         ]);
 
-        this.form.id_curriculo = this.normalizeList(planData.curriculos).map(
-          (curriculo) => Number(curriculo.id)
-        );
-        this.curriculos = this.prepararEstructuraEditable(this.curriculos);
+        const estructuraSnapshot = this.estructuraPlanParaEdicion(planData);
+
+        if (estructuraSnapshot.length) {
+          this.curriculos = this.prepararEstructuraEditable(estructuraSnapshot);
+          this.form.id_curriculo = this.curriculos.map((curriculo) =>
+            Number(curriculo.id)
+          );
+        } else {
+          this.form.id_curriculo = this.normalizeList(planData.curriculos).map(
+            (curriculo) => Number(curriculo.id)
+          );
+          this.curriculos = this.prepararEstructuraEditable(this.curriculos);
+        }
       } catch (error) {
         console.error(error);
         this.formError = "No fue posible preparar la modificación del plan.";
@@ -1967,6 +2047,16 @@ export default {
           })
         ),
       }));
+    },
+    estructuraPlanParaEdicion(planData) {
+      const snapshotStructure =
+        planData.estructura_snapshot?.estructura ||
+        planData.modificacion?.estructura_snapshot?.estructura ||
+        this.estructuraDesdeSnapshotDetalle(planData.estructura_snapshot);
+
+      return snapshotStructure
+        ? this.curriculosDesdeSnapshot(snapshotStructure)
+        : [];
     },
     resolveAsignaturaAnioIds(asignatura) {
       const ids = this.normalizeList(asignatura.id_a_academico)
@@ -2304,6 +2394,16 @@ export default {
           id_prog_form: anio.id_prog_form,
           nombre_completo: anio.nombre_completo,
         }));
+    },
+    onAsignaturaExamenFinalChange(asignatura, value) {
+      if (this.toBooleanFlag(value)) {
+        asignatura.tiene_trabajo_curso = false;
+      }
+    },
+    onAsignaturaTrabajoCursoChange(asignatura, value) {
+      if (this.toBooleanFlag(value)) {
+        asignatura.tiene_examen_final = false;
+      }
     },
     asignaturaAniosSeleccionados(asignatura) {
       const anios = this.normalizeList(asignatura.anios);
@@ -3013,6 +3113,12 @@ export default {
   flex-direction: column;
 }
 
+.asignatura-row-new {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .asignatura-row > div:first-child {
   display: flex;
   min-width: 0;
@@ -3024,15 +3130,31 @@ export default {
   display: grid !important;
   width: 100%;
   grid-template-columns:
+    minmax(180px, 1.2fr)
+    minmax(90px, 0.5fr)
+    minmax(90px, 0.5fr)
+    minmax(130px, 0.65fr)
+    minmax(120px, 0.55fr)
+    minmax(120px, 0.55fr)
+    minmax(200px, 1fr)
+    44px;
+  gap: 10px;
+  padding-bottom: 6px;
+}
+
+.asignatura-row-new .asignatura-edit-grid {
+  width: max-content;
+  min-width: 1180px;
+  grid-template-columns:
     minmax(210px, 1fr)
     minmax(190px, 1fr)
     100px
     100px
     140px
     130px
+    130px
     minmax(220px, 0.9fr)
     44px;
-  gap: 10px;
 }
 
 .asignatura-name-readonly {

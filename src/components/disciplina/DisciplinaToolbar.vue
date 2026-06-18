@@ -2,7 +2,7 @@
   <v-row class="mb-4">
     <v-col cols="6">
       <v-text-field
-        label="Buscar por nombre o código"
+        label="Buscar por nombre, codigo o programa"
         prepend-inner-icon="mdi-magnify"
         variant="outlined"
         rounded="lg"

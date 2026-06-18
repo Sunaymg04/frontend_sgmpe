@@ -146,7 +146,12 @@ export default {
     },
     currentAccess() {
       const access = this.$store.getters.authAccess || [];
-      return access.find((item) => item?.active) || null;
+      const primaryRole = this.$store.getters.primaryRole;
+      return (
+        access.find((item) => item?.active && item?.role === primaryRole) ||
+        access.find((item) => item?.active) ||
+        null
+      );
     },
     role() {
       return this.formatRole(this.currentAccess?.role);

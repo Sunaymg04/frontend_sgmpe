@@ -40,6 +40,21 @@
             disabled
           />
 
+          <v-select
+            v-if="departmentId"
+            v-model="form.id_prog_form"
+            :items="programas"
+            item-title="nombre"
+            item-value="id"
+            label="Programa de formación"
+            variant="outlined"
+            rounded="lg"
+            prepend-inner-icon="mdi-account-school-outline"
+            class="mb-4"
+            :loading="loadingProgramas"
+            :disabled="loadingProgramas || programas.length <= 1"
+          />
+
           <!-- Curriculo -->
           <v-select
             v-model="form.id_curriculo"
@@ -84,12 +99,15 @@ export default {
   data() {
     return {
       curriculos: [],
+      programas: [],
+      loadingProgramas: false,
 
       form: {
         id: null,
         nombre: "",
         fondo_tiempo: 0,
         id_curriculo: [],
+        id_prog_form: null,
       },
     };
   },
@@ -106,6 +124,15 @@ export default {
     },
     fondoTiempoCalculado() {
       return Number(this.form.fondo_tiempo || 0);
+    },
+    authAccess() {
+      return this.$store.getters.authAccess || [];
+    },
+    departmentId() {
+      const jefe = this.authAccess.find(
+        (item) => item?.active && item?.role === "jefe_departamento"
+      );
+      return jefe?.departamento_id ?? jefe?.id_departamento ?? null;
     },
   },
   watch: {
@@ -124,6 +151,12 @@ export default {
             id_curriculo: Array.isArray(valor.curriculos)
               ? valor.curriculos.map((c) => Number(c.id))
               : [],
+
+            id_prog_form:
+              valor.id_prog_form ??
+              valor.curriculos?.find((c) => c?.pivot?.id_prog_form)?.pivot
+                ?.id_prog_form ??
+              null,
           };
         }
       },
@@ -139,6 +172,30 @@ export default {
       } catch (error) {
         console.error(error);
       }
+    },
+    async obtenerProgramasDepartamento() {
+      if (!this.departmentId) return;
+
+      this.loadingProgramas = true;
+      try {
+        const res = await api.get(
+          `/departamento/${this.departmentId}/carreras`
+        );
+        this.programas = this.normalizeList(res.data);
+
+        if (!this.form.id_prog_form && this.programas.length === 1) {
+          this.form.id_prog_form = Number(this.programas[0].id);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loadingProgramas = false;
+      }
+    },
+    normalizeList(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
     },
 
     async guardar() {
@@ -183,6 +240,8 @@ export default {
         nombre: "",
         fondo_tiempo: 0,
         id_curriculo: [],
+        id_prog_form:
+          this.programas.length === 1 ? Number(this.programas[0].id) : null,
       };
       this.$emit("cerrado");
     },
@@ -191,12 +250,14 @@ export default {
         id: this.form.id,
         nombre: this.form.nombre,
         id_curriculo: this.form.id_curriculo,
+        id_prog_form: this.form.id_prog_form,
       };
     },
   },
 
   mounted() {
     this.obtenerCurriculos();
+    this.obtenerProgramasDepartamento();
   },
 };
 </script>
